@@ -149,6 +149,7 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
     partiallyMappedCount = 0
     totallyMappedCount = 0
     dicoCigar = {'M':0,'I':0,'D':0,'S':0,'H':0,'N':0,'P':0,'X':0,'=':0}
+    mutIndex = {}
 
     if option != "t":
         summary_data_file = open("summary_data_file"+str(samFileNumber)+".txt", "w")
@@ -237,11 +238,20 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                     if re.match('(?![0-9]+M$)', line[5]): partiallyMappedCount += 1 
                     else: totallyMappedCount +=1
 
-                    # analyse du CIGAR
                     champsCigar = re.findall('[0-9]+\D', line[5])
                     for champ in range(len(champsCigar)):
                         temp = champsCigar[champ]
                         dicoCigar[temp[-1]] += int(temp[:(len(temp)-1)])
+
+                    if len(line)-11 != 0:
+                            for c in range(11,len(line)):
+                                pointerSeq = 0
+                                if line[c][:5] == "MD:Z:" and re.match('(?![0-9]+$)', line[c][5:]):
+                                        mutations = re.findall('[0-9]+\D', line[c])
+                                        for m in range(len(mutations)):
+                                            matchNb = int(mutations[m][:-1])
+                                            mutIndex[int(line[3])+pointerSeq+matchNb] = str(line[9][pointerSeq+matchNb])+"->"+str(mutations[m][-1])
+                                            pointerSeq += matchNb+1
 
             elif researchQuery == False:
                 researchQuery = True
@@ -255,10 +265,10 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
     if errorSearch == "y":
         print(Fore.YELLOW+"Fin de la recherche d'erreur."+Fore.RESET)
         exit()
-    print(dicoCigar)
+
     totalValue = 0
     for value in dicoCigar: totalValue += dicoCigar[value]
-    for key in dicoCigar.keys(): dicoCigar[key] = round((dicoCigar[key]*100/totalValue), 4)
+    for key in dicoCigar.keys(): dicoCigar[key] = round((dicoCigar[key]*100/totalValue), 2)
 
     if option != "t":
         summary_data_file.write("**********************************\ntotal reads count : "+str(i))
