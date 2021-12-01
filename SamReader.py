@@ -8,6 +8,7 @@ __date__ = "12/14/2021"
 __licence__ ="This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>."
         
 import os, sys, csv, re, colorama, numpy
+from shapely.geometry import MultiPoint
 from colorama import Fore, Back
 
 # ********************
@@ -73,18 +74,17 @@ def helpProgramm():
     print("Choosing from one of the following options is MANDATORY :\n-t	show the results in the terminal, without saving them in a file\n-o	save the results in a file which name is given by the user, or in the default file 'summary_data_file.txt'\n-t -o	show the results int he terminal AND save them in a file")
     exit()
 
-# on vérifie si l'utilisateur a appelé la section Help, et le cas échéant quelle section il désire voir :
-helpResponse = 0
+helpQuery = "NULL"
 if re.search("^-h[a-x]?$", sys.argv[1]):
         if sys.argv[1] == "-h":
             print("What do you need help for ?")
             print("FLAG field ? -hf \nCIGAR field ? -hc\nSystem requirements ? -hr\nSAM file ? -hs")
-            helpResponse = input()
-        if sys.argv[1] == "-hf" or helpResponse == "-hf":helpFLAG()
-        if sys.argv[1] == "-hc" or helpResponse == "-hc":helpCigar()
-        if sys.argv[1] == "-hr" or helpResponse == "-hr":helpRequirements()
-        if sys.argv[1] == "-hs" or helpResponse == "-hs":helpSAM()
-        if sys.argv[1] == "-hp" or helpResponse == "-hp":helpProgramm()
+            helpQuery = input()
+        if sys.argv[1] == "-hf" or helpQuery == "-hf":helpFLAG()
+        if sys.argv[1] == "-hc" or helpQuery == "-hc":helpCigar()
+        if sys.argv[1] == "-hr" or helpQuery == "-hr":helpRequirements()
+        if sys.argv[1] == "-hs" or helpQuery == "-hs":helpSAM()
+        if sys.argv[1] == "-hp" or helpQuery == "-hp":helpProgramm()
 
 # *******************
 # ** FILE ANALYSIS **
@@ -92,17 +92,10 @@ if re.search("^-h[a-x]?$", sys.argv[1]):
 
 csv.field_size_limit(sys.maxsize)   # augmentation de la taille max des champs dans le fichier csv afin de pouvoir analyser des alignements de reads > 131kb
 
-## Définition d'une fonction pour mettre le FLAG en binaire
-
-def flagBinary(flag):
-        flagB = bin(int(flag))  # Transform the integer into a binary.
-        flagB = flagB[2:]   # Remove '0b' Example: '0b1001101' > '1001101'
-        flagB = list(flagB) 
-        if len(flagB) < 12: # Size adjustement to 12 (maximal flag size)
-            add = 12 - len(flagB)   # We compute the difference between the maximal flag size (12) and the length of the binary flag.
-            for m in range(add):
-                flagB.insert(0,'0') # We insert 0 to complete until the maximal flag size.
-        return(flagB)
+def flagToBinary(flag):
+    MAX_FLAG_SIZE = 12
+    flagBinary = bin(int(flag))  # Transform the integer into a binary.
+    return(flagBinary)
 
 ## 1. Initialisation des éléments non modifiés par la suite
 # matrices :
@@ -113,6 +106,8 @@ Program = numpy.array([['ID','PN','CL','PP','DS','VN'],['Program record identifi
 Comments = numpy.array([['CO'],['Commentaire(s)']])
 # dictionnaires :
 infoHeaders = {0:Header_Line,1:Reference_sequence_dictionary,2:Read_group,3:Program,4:Comments,5:'Header_Line',6:'Reference_sequence_dictionary',7:'Read_group',8:'Program',9:'Comments'}
+dicoNMfield = {}
+dicoMFfield = {}
 # compilation d'expression régulière :
 regex = re.compile('^[0-9A-Za-z!#$%&+./:;?@^_|~-][0-9A-Za-z!#$%&*+./:;=?@^_|~-]*$')
 # tuple :
@@ -127,8 +122,7 @@ for o in range(len(sys.argv)):
 # on laisse le choix à l'utilisateur de demander les données dans le terminal, ou écrites dans un fichier output (dont le nom est donné ou non), ou les 2 :
 options = len(sys.argv)-fileNumber-1
 if len(sys.argv)-(fileNumber+1) <= 0:
-    answer = input("Error : no options were given, '-hp' for help about how to run the programm.\n")
-    if answer == '-hp': helpProgramm()
+    if input("Error : no options were given, '-hp' for help about how to run the programm.\n") == '-hp': helpProgramm()
     else: exit()
 if sys.argv[fileNumber+1] == "-t":
     if len(sys.argv)-(fileNumber+2) > 0 and sys.argv[fileNumber+2] == "-o":
@@ -238,13 +232,20 @@ for samFile in range(1,fileNumber+1):
 
             # si la ligne ne présente pas d'erreurs alors 'k' vaut 11
             if k == 11:
-                flag = flagBinary(ligne[1]) # on appelle la fonction pour mettre le FLAG en binaire
+                flag = flagToBinary(ligne[1]) # on appelle la fonction pour mettre le FLAG en binaire
                 if int(flag[-3]) == 1:  # si '0100' est présent dans le binaire ça correspond à un FLAG de 4 (= read non mappé)
                     unmapped_count += 1
 
                 if int(flag[-2]) == 1:  # si '0010' est présent dans le binaire ça correspond à un FLAG de 2 (= read bien aligné), donc à analyser
                     if re.match('(?![0-9]+M$)', ligne[5]):  # dans le CIGAR, vérifier que la RE "XXXM" (= 100% de match) n'est pas présente
                         partially_mapped_count += 1
+
+                        if len(ligne)-11 != 0:
+                            for c in range(11,len(ligne)):
+                                if ligne[c][:5] == "NM:i:":
+                                    dicoNMfield[i] = int(ligne[c][5:])
+                                    
+                                
                     else:
                         totally_mapped_count +=1
 
@@ -282,6 +283,8 @@ for samFile in range(1,fileNumber+1):
                                     summary_data_file.write(str(infoHeaders[h][1,y])+" : "+str(ligne[z][3:])+"\n")  
                     if options != 0:
                         summary_data_file.write("\n")
+
+    
 
     # si l'utilisateur avait choisi de chercher toutes les erreurs du document : on arrête la recherche à la fin du fichier et on quitte
     if analyseComplete == "y":
