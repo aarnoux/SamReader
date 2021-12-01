@@ -8,12 +8,30 @@ __date__ = "12/14/2021"
 __licence__ ="This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>."
         
 import os, sys, csv, re, colorama, numpy
-from shapely.geometry import MultiPoint
 from colorama import Fore, Back
 
-# ********************
-# ** HELP FUNCTIONS **
-# ********************
+# Matrices
+headerLine = numpy.array([['VN','SO','GO','SS'],['Format version','Sorting order of alignments','Grouping of alignments','Sub-sorting order of alignments']])
+ReferenceSequenceDictionary = numpy.array([['SN','LN','AH','AN','AS','DS','M5','SP','TP','UR'],['Reference sequence name','Reference sequence length','Alternate locus','Alternative reference sequence names','Genome assembly identifier','Description','MD5 checksum of the sequence','Species','Molecule topology','URI of the sequence']])
+readGroup = numpy.array([['ID','BC','CN','DS','DT','FO','KS','LB','PG','PI','PL','PM','PU','SM'],['Read group identifier','Barcode sequence','Name of sequencing center','Description','Date the run was produced','Flow order','Array of nucleotide bases','Library','Processing programs','Predicted median insert size','Platform/technology','Platform model','Platform unit','Sample']])
+program = numpy.array([['ID','PN','CL','PP','DS','VN'],['Program record identifier','Program name','Command line','Previous @PG-ID','Description','program version']])
+comments = numpy.array([['CO'],['Commentaire(s)']])
+
+# Dictionnaires
+infoHeader = {0:headerLine,1:ReferenceSequenceDictionary,2:readGroup,3:program,4:comments,5:'Header line',6:'Reference sequence dictionary',7:'Read group',8:'Program',9:'Comments'}
+
+# Regex
+regex = re.compile('^[0-9A-Za-z!#$%&+./:;?@^_|~-][0-9A-Za-z!#$%&*+./:;=?@^_|~-]*$')
+
+# Tuple
+headers = ('@HD','@SQ','@RG','@PG','@CO')
+
+# Constantes
+ARGUMENTS_LIST = sys.argv
+SCRIPT_CALL = 1
+
+# augmentation de la taille max des champs dans le fichier csv afin de pouvoir analyser des alignements de reads > 131kb
+csv.field_size_limit(sys.maxsize)
 
 def helpFLAG():
     print("Bit\t\tDescription")
@@ -69,13 +87,14 @@ def helpSAM():
     print("11\tQUAL\tString\t[!-~]+\t\t\t\tASCII of Phred-scaled base QUALity+33")
     exit()
 
-def helpProgramm():
-    print("\nSamReader is a small programm that analyses SAM files. It can analyse multiple files in one go.")
+def helpProgram():
+    print("\nSamReader is a small program that analyses SAM files. It can analyse multiple files in one go.")
     print("Choosing from one of the following options is MANDATORY :\n-t	show the results in the terminal, without saving them in a file\n-o	save the results in a file which name is given by the user, or in the default file 'summary_data_file.txt'\n-t -o	show the results int he terminal AND save them in a file")
     exit()
 
-helpQuery = "NULL"
-if re.search("^-h[a-x]?$", sys.argv[1]):
+def help():
+    helpQuery = "NULL"
+    if re.search("^-h[a-x]?$", sys.argv[1]):
         if sys.argv[1] == "-h":
             print("What do you need help for ?")
             print("FLAG field ? -hf \nCIGAR field ? -hc\nSystem requirements ? -hr\nSAM file ? -hs")
@@ -84,256 +103,212 @@ if re.search("^-h[a-x]?$", sys.argv[1]):
         if sys.argv[1] == "-hc" or helpQuery == "-hc":helpCigar()
         if sys.argv[1] == "-hr" or helpQuery == "-hr":helpRequirements()
         if sys.argv[1] == "-hs" or helpQuery == "-hs":helpSAM()
-        if sys.argv[1] == "-hp" or helpQuery == "-hp":helpProgramm()
+        if sys.argv[1] == "-hp" or helpQuery == "-hp":helpProgram()
 
-# *******************
-# ** FILE ANALYSIS **
-# *******************
+def inputFileNumber(ARGUMENTS_LIST):
+    fileNumber = SCRIPT_CALL
+    for argument in range(len(ARGUMENTS_LIST)):
+        if len(ARGUMENTS_LIST[argument]) > 2 and re.search('.sam$', ARGUMENTS_LIST[argument]): fileNumber += 1
+    return fileNumber
 
-csv.field_size_limit(sys.maxsize)   # augmentation de la taille max des champs dans le fichier csv afin de pouvoir analyser des alignements de reads > 131kb
+def userOptionChoice(fileNumber):
+    option = "NULL"
+    if len(ARGUMENTS_LIST)-(fileNumber) <= 0:
+        if input("Error : no options were given, '-hp' for help about how to run the program.\n") == '-hp': helpProgram()
+        else: exit()
+    if ARGUMENTS_LIST[fileNumber] == "-t": option = "t"
+    if len(ARGUMENTS_LIST)-(fileNumber+1) > 0 and ARGUMENTS_LIST[fileNumber+1] == "-o": option = "t+o"
+    elif ARGUMENTS_LIST[fileNumber] == "-o": option = "o"
+    if option == "NULL":
+        if input("Option error : a non-authorized option was given, '-hp' for help about how to run the program.\n") == '-hp-': helpprogram()
+        else: exit()
+    return option
 
-def flagToBinary(flag):
-    MAX_FLAG_SIZE = 12
-    flagBinary = bin(int(flag))  # Transform the integer into a binary.
-    return(flagBinary)
-
-## 1. Initialisation des éléments non modifiés par la suite
-# matrices :
-Header_Line = numpy.array([['VN','SO','GO','SS'],['Format version','Sorting order of alignments','Grouping of alignments','Sub-sorting order of alignments']])
-Reference_sequence_dictionary = numpy.array([['SN','LN','AH','AN','AS','DS','M5','SP','TP','UR'],['Reference sequence name','Reference sequence length','Alternate locus','Alternative reference sequence names','Genome assembly identifier','Description','MD5 checksum of the sequence','Species','Molecule topology','URI of the sequence']])
-Read_group = numpy.array([['ID','BC','CN','DS','DT','FO','KS','LB','PG','PI','PL','PM','PU','SM'],['Read group identifier','Barcode sequence','Name of sequencing center','Description','Date the run was produced','Flow order','Array of nucleotide bases','Library','Processing programs','Predicted median insert size','Platform/technology','Platform model','Platform unit','Sample']])
-Program = numpy.array([['ID','PN','CL','PP','DS','VN'],['Program record identifier','Program name','Command line','Previous @PG-ID','Description','Program version']])
-Comments = numpy.array([['CO'],['Commentaire(s)']])
-# dictionnaires :
-infoHeaders = {0:Header_Line,1:Reference_sequence_dictionary,2:Read_group,3:Program,4:Comments,5:'Header_Line',6:'Reference_sequence_dictionary',7:'Read_group',8:'Program',9:'Comments'}
-dicoNMfield = {}
-dicoMFfield = {}
-# compilation d'expression régulière :
-regex = re.compile('^[0-9A-Za-z!#$%&+./:;?@^_|~-][0-9A-Za-z!#$%&*+./:;=?@^_|~-]*$')
-# tuple :
-headers = ('@HD','@SQ','@RG','@PG','@CO')
-
-## 2. Gestion des options utilisateur
-# on cherche le nombre de fichiers donnés en input :
-fileNumber = 0
-for o in range(len(sys.argv)):
-    if len(sys.argv[o]) > 2 and re.search('.sam$', sys.argv[o]):
-        fileNumber += 1
-# on laisse le choix à l'utilisateur de demander les données dans le terminal, ou écrites dans un fichier output (dont le nom est donné ou non), ou les 2 :
-options = len(sys.argv)-fileNumber-1
-if len(sys.argv)-(fileNumber+1) <= 0:
-    if input("Error : no options were given, '-hp' for help about how to run the programm.\n") == '-hp': helpProgramm()
-    else: exit()
-if sys.argv[fileNumber+1] == "-t":
-    if len(sys.argv)-(fileNumber+2) > 0 and sys.argv[fileNumber+2] == "-o":
-        options = 1
-    else: options = 0
-
-for samFile in range(1,fileNumber+1):
-    if options != 0:
-        summary_data_file = open("summary_data_file"+str(samFile)+".txt", "w")
-        summary_data_file.write('Informations :\n\n')
-    
-    ## 1. Vérification que l'argument est un fichier SAM non vide
-
-    # on vérifie que l'argument est un fichier :
-    if os.path.isfile(sys.argv[samFile]) ==  False:
+def checkFileIntegrity(samFileNumber):
+    if os.path.isfile(ARGUMENTS_LIST[samFileNumber]) ==  False:
         print("File error : L'argument n'est pas un fichier.")
         exit()
-    # on teste si le fichier est vide :
-    elif os.path.getsize(sys.argv[samFile]) == 0:
+    elif os.path.getsize(ARGUMENTS_LIST[samFileNumber]) == 0:
         print("File error : Le fichier est vide.")
         exit()
-    # on check l'extension du fichier :
-    elif sys.argv[samFile].endswith(".sam") == False: 
+    elif ARGUMENTS_LIST[samFileNumber].endswith(".sam") == False: 
         print("Format error : seul le format SAM est accepté.")
         exit()
 
-    ## 2. Préparation de l'analyse du fichier
-
-    ## 2.1 Ouverture et lecture du fichier
-
-    # on lit le fichier dans une variable "file", on indique que les champs sont séparés par des tabulations :
-    fi = open(sys.argv[samFile])
+def fileHandler(samFileNumber):
+    fi = open(ARGUMENTS_LIST[samFileNumber])
     file = csv.reader(fi, delimiter = '\t', quoting = csv.QUOTE_NONE)
     fi.close
+    return file
 
-    ## 2.2 (ré)initialisations
-
-    # variables :
+def fileAnalysis(file, option, samFileNumber, fileNumber):
     i = 0
-    j = 0
-    analyseComplete = 0
-    unmapped_count = 0
-    partially_mapped_count = 0
-    totally_mapped_count = 0
-
-    # dictionnaires :
+    researchQuery = False
+    errorSearch = "NULL"
+    unmappedCount = 0
+    partiallyMappedCount = 0
+    totallyMappedCount = 0
     dicoCigar = {'M':0,'I':0,'D':0,'S':0,'H':0,'N':0,'P':0,'X':0,'=':0}
 
-    ## 4. Analyse du fichier
+    if option != "t":
+        summary_data_file = open("summary_data_file"+str(samFileNumber)+".txt", "w")
+        summary_data_file.write('Informations :\n\n')
 
-    # analyse ligne par ligne du SAM :
-    for ligne in file:
-        i += 1   # incrémentation du numéro de ligne à chaque tour de boucle
-        k = 0
-        if ligne[0].startswith(headers) == False:   # si la ligne analysée ne fait pas partie du header on analyse les champs
+    for line in file:
+        i += 1
+        ERROR_COUNT = 11    # il y a 11 champs obligatoires dans un fichier SAM
 
-        # la recherche d'erreurs dans les champs débute par la recherche de l'expression régulière (RE) du champ, puis :
-        # - si la RE est correcte on incrémente le compteur 'k' de 1
-        # - si la RE est incorrecte, on affiche un message d'erreur et on finit d'analyser la ligne
-
-        # on pourrait imbriquer les conditions 'if...else...' afin de gagner du temps lors de l'analyse du fichier, mais on perd de la précision lors de l'affichage des erreurs (on peut le changer en fonction du profil d'utilisateur visé)
-
-            if (re.search('^[!-?A-~]{1,254}$', ligne[0])):
-                k = k + 1
-            else:
-                print(Fore.RED+"QNAME field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ QNAME a une expression régulière non conforme, ou un des champ de la ligne n'est pas délimité par une tabulation.\nChamp non conforme : "+str(ligne[0])+"\n"+str(ligne))
-            if (re.search('^[0-9]{1,4}$', ligne[1])):
-                k = k + 1
-            else:
-                print(Fore.RED+"FLAG field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ FLAG a une expression régulière non conforme, ou un des champ de la ligne n'est pas délimité par une tabulation.\nChamp non conforme : "+str(ligne[1])+"\n"+str(ligne))
-            if (regex.search(ligne[2]) or re.search('\*', ligne[2])):
-                k = k + 1
-            else:
-                print(Fore.RED+"RNAME field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ RNAME a une expression régulière non conforme, ou un des champ de la ligne n'est pas délimité par une tabulation.\nChamp non conforme : "+str(ligne[2])+"\n"+str(ligne))
-            if (re.search('^[0-9]*$', ligne[3])):
-                k = k + 1
-            else:
-                print(Fore.RED+"POS field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ POS a une expression régulière non conforme, ou un des champ de la ligne n'est pas délimité par une tabulation.\nChamp non conforme : "+str(ligne[3])+"\n"+str(ligne))
-            if (re.search('^[0-5][0-9]$''|^[0-9]$''|^(60)$''|^(255)$', ligne[4])):
-                k = k + 1
-            else:
-                print(Fore.RED+"MAPQ field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ MAPQ a une expression régulière non conforme, ou un des champ de la ligne n'est pas délimité par une tabulation.\nChamp non conforme : "+str(ligne[4])+"\n"+str(ligne))
-            if (re.search('^\*$''|^([0-9]+[MIDNSHPX=])+$', ligne[5])):
-                k = k + 1
-            else:
-                print(Fore.RED+"CIGAR field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ CIGAR a une expression régulière non conforme, ou un des champ de la ligne n'est pas délimité par une tabulation.\nChamp non conforme : "+str(ligne[5])+"\n"+str(ligne))                             
-            if (regex.search(ligne[6]) or re.search('^\*$', ligne[6]) or re.search('^=$', ligne[6])):
-                k = k + 1
-            else:
-                print(Fore.RED+"RNEXT field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ RNEXT a une expression régulière non conforme, ou un des champ de la ligne n'est pas délimité par une tabulation.\nChamp non conforme : "+str(ligne[6])+"\n"+str(ligne))
-            if (re.search('^[0-9]*$', ligne[7])):
-                k = k + 1
-            else:
-                print(Fore.RED+"PNEXT field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ PNEXT a une expression régulière non conforme, ou un des champ de la ligne n'est pas délimité par une tabulation.\nChamp non conforme : "+str(ligne[7])+"\n"+str(ligne))
-            if (re.search('^^-?[0-9]{1,30}$''|^-?20{31}$', ligne[8])):
-                k = k + 1
-            else:
-                print(Fore.RED+"TLEN field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ TLEN a une expression régulière non conforme, ou un des champ de la ligne n'est pas délimité par une tabulation.\nChamp non conforme : "+str(ligne[8])+"\n"+str(ligne))
-            if (re.search('^\*|[A-Za-z=.]+$', ligne[9])):
-                k = k + 1
-            else:
-                print(Fore.RED+"SEQ field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ SEQ a une expression régulière non conforme, ou un des champ de la ligne n'est pas délimité par une tabulation.\nChamp non conforme : "+str(ligne[9])+"\n"+str(ligne))
-            if (re.search('^[!-~]+$', ligne[10])):
-                k = k + 1
-            else:
-                print(Fore.RED+"QUAL field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ QUAL a une expression régulière non conforme, ou un des champ de la ligne n'est pas délimité par une tabulation.\nChamp non conforme : "+str(ligne[10])+"\n"+str(ligne))
-
-            # si la ligne ne présente pas d'erreurs alors 'k' vaut 11
-            if k == 11:
-                flag = flagToBinary(ligne[1]) # on appelle la fonction pour mettre le FLAG en binaire
-                if int(flag[-3]) == 1:  # si '0100' est présent dans le binaire ça correspond à un FLAG de 4 (= read non mappé)
-                    unmapped_count += 1
-
-                if int(flag[-2]) == 1:  # si '0010' est présent dans le binaire ça correspond à un FLAG de 2 (= read bien aligné), donc à analyser
-                    if re.match('(?![0-9]+M$)', ligne[5]):  # dans le CIGAR, vérifier que la RE "XXXM" (= 100% de match) n'est pas présente
-                        partially_mapped_count += 1
-
-                        if len(ligne)-11 != 0:
-                            for c in range(11,len(ligne)):
-                                if ligne[c][:5] == "NM:i:":
-                                    dicoNMfield[i] = int(ligne[c][5:])
-                                    
-                                
+        if line[0].startswith(headers) == True:
+            for field in range(len(headers)):
+                if line[0] == headers[field]:
+                    if option == "t" or option == "t+o":
+                        print("\n"+headers[field]+" - "+infoHeader[field+5])
                     else:
-                        totally_mapped_count +=1
+                        summary_data_file.write(headers[field]+" - "+infoHeader[field+5]+"\n")
+                    for headerSubField in range(1,len(line)):
+                        for m in range(len(infoHeader[field])):
+                            if infoHeader[field][0,m] == line[headerSubField][:2]:
+                                if option == "t" or option == "t+o":
+                                    print(str(infoHeader[field][1,m])+" : "+str(line[headerSubField][3:]))
+                                if option != "t":
+                                    summary_data_file.write(str(infoHeader[field][1,m])+" : "+str(line[headerSubField][3:])+"\n")
+                    if option != "t": summary_data_file.write("\n")
+        else:
+            # la recherche d'erreurs dans les champs débute par la recherche de l'expression régulière (RE) du champ, puis :
+            # - si la RE est correcte on diminue le compteur 'ERROR_COUNT' de 1
+            # - si la RE est incorrecte, on affiche un message d'erreur et on finit d'analyser la line
+            if (re.search('^[!-?A-~]{1,254}$', line[0])):
+                ERROR_COUNT -= 1
+            else:
+                print(Fore.RED+"QNAME field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ QNAME a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[0])+"\n"+str(line))
+            if (re.search('^[0-9]{1,4}$', line[1])):
+                ERROR_COUNT -= 1
+            else:
+                print(Fore.RED+"FLAG field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ FLAG a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[1])+"\n"+str(line))
+            if (regex.search(line[2]) or re.search('\*', line[2])):
+                ERROR_COUNT -= 1
+            else:
+                print(Fore.RED+"RNAME field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ RNAME a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[2])+"\n"+str(line))
+            if (re.search('^[0-9]*$', line[3])):
+                ERROR_COUNT -= 1
+            else:
+                print(Fore.RED+"POS field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ POS a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[3])+"\n"+str(line))
+            if (re.search('^[0-5][0-9]$''|^[0-9]$''|^(60)$''|^(255)$', line[4])):
+                ERROR_COUNT -= 1
+            else:
+                print(Fore.RED+"MAPQ field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ MAPQ a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[4])+"\n"+str(line))
+            if (re.search('^\*$''|^([0-9]+[MIDNSHPX=])+$', line[5])):
+                ERROR_COUNT -= 1
+            else:
+                print(Fore.RED+"CIGAR field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ CIGAR a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[5])+"\n"+str(line))                             
+            if (regex.search(line[6]) or re.search('^\*$', line[6]) or re.search('^=$', line[6])):
+                ERROR_COUNT -= 1
+            else:
+                print(Fore.RED+"RNEXT field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ RNEXT a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[6])+"\n"+str(line))
+            if (re.search('^[0-9]*$', line[7])):
+                ERROR_COUNT -= 1
+            else:
+                print(Fore.RED+"PNEXT field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ PNEXT a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[7])+"\n"+str(line))
+            if (re.search('^^-?[0-9]{1,30}$''|^-?20{31}$', line[8])):
+                ERROR_COUNT -= 1
+            else:
+                print(Fore.RED+"TLEN field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ TLEN a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[8])+"\n"+str(line))
+            if (re.search('^\*|[A-Za-z=.]+$', line[9])):
+                ERROR_COUNT -= 1
+            else:
+                print(Fore.RED+"SEQ field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ SEQ a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[9])+"\n"+str(line))
+            if (re.search('^[!-~]+$', line[10])):
+                ERROR_COUNT -= 1
+            else:
+                print(Fore.RED+"QUAL field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ QUAL a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[10])+"\n"+str(line))
 
-                    expCigar = re.findall('[0-9]+\D', ligne[5])  # on isole tous les champs du CIGAR
-                    for champ in range(len(expCigar)):
-                        temp = expCigar[champ]
+            # si la line ne présente pas d'erreurs alors 'ERROR_COUNT' vaut 11
+            if ERROR_COUNT == 0:
+                flag = bin(int(line[1]))
+
+                # si '0100' est présent dans le binaire ça correspond à un FLAG de 4 (= read non mappé)
+                if int(flag[-3]) == 1:
+                    unmappedCount += 1
+
+                # si '0010' est présent dans le binaire ça correspond à un FLAG de 2 (= read bien aligné)
+                if int(flag[-2]) == 1:
+
+                    # dans le CIGAR, vérifier qu'il n'y a pas 100% de match (= read partiellement mappé)
+                    if re.match('(?![0-9]+M$)', line[5]): partiallyMappedCount += 1 
+                    else: totallyMappedCount +=1
+
+                    # analyse du CIGAR
+                    champsCigar = re.findall('[0-9]+\D', line[5])
+                    for champ in range(len(champsCigar)):
+                        temp = champsCigar[champ]
                         dicoCigar[temp[-1]] += int(temp[:(len(temp)-1)])
 
-            elif j == 0:    # si k ne vaut pas 11 (= présence d'une erreur dans le fichier)
-                j = j + 1   # on ne veut passer qu'une fois dans cette condition
-                k = 11 - k  # calcul du nombre d'erreurs trouvées sur la ligne
-
-                # l'utilisateur a le choix de chercher toutes les erreurs du fichier ou de quitter le programme :
-                analyseComplete = input(Back.RED+"Document non analysable"+Back.RESET+" : "+str(k)+" erreur(s) d'expressions régulières trouvée(s) à la ligne "+str(i)+", souhaitez-vous rechercher les erreurs dans le reste du fichier ?\ny/n\n")
-                if analyseComplete == "n":
+            elif researchQuery == False:
+                researchQuery = True
+                errorSearch = input(Back.RED+"Document non analysable"+Back.RESET+" : "+str(ERROR_COUNT)+" erreur(s) d'expressions régulières trouvée(s) à la line "+str(i)+", souhaitez-vous rechercher les erreurs dans le reste du fichier ?\ny/n\n")
+                if errorSearch == "n":
                     exit()
-                elif analyseComplete != "y":
+                elif errorSearch != "y":
                     print(Fore.RED+"Input error : arrêt du script"+Fore.RESET)
                     exit()
 
-        # si la ligne anlysée fait partie du header on extrait les informations qu'on stocke dans le fichier "summary_data_file" :
-        else:
-            for h in range(4):
-                if ligne[0] == headers[h]:
-                    if options == 0 or options == 1:
-                        print("\n"+headers[h]+" - "+str(infoHeaders[h+5]))
-                    if options != 0:
-                        summary_data_file.write(headers[h]+" - "+str(infoHeaders[h+5])+"\n")
-                    for z in range(1,len(ligne)):
-                        for y in range(len(infoHeaders[h])):
-                            if infoHeaders[h][0,y] == ligne[z][:2]:
-                                if options == 0 or options == 1:
-                                    print(str(infoHeaders[h][1,y])+" : "+str(ligne[z][3:]))
-                                if options != 0:
-                                    summary_data_file.write(str(infoHeaders[h][1,y])+" : "+str(ligne[z][3:])+"\n")  
-                    if options != 0:
-                        summary_data_file.write("\n")
-
-    
-
-    # si l'utilisateur avait choisi de chercher toutes les erreurs du document : on arrête la recherche à la fin du fichier et on quitte
-    if analyseComplete == "y":
+    if errorSearch == "y":
         print(Fore.YELLOW+"Fin de la recherche d'erreur."+Fore.RESET)
         exit()
+    print(dicoCigar)
+    totalValue = 0
+    for value in dicoCigar: totalValue += dicoCigar[value]
+    for key in dicoCigar.keys(): dicoCigar[key] = round((dicoCigar[key]*100/totalValue), 4)
 
-    if options != 0:
+    if option != "t":
         summary_data_file.write("**********************************\ntotal reads count : "+str(i))
-        summary_data_file.write("\n\t-> properly aligned reads count : "+str(totally_mapped_count+partially_mapped_count)+" ("+str(round((totally_mapped_count+partially_mapped_count)*100/i))+"% of total reads)")
-        summary_data_file.write("\n\t\t-> totally mapped reads count : "+str(totally_mapped_count))
-        summary_data_file.write("\n\t\t-> partially mapped reads count : "+str(partially_mapped_count))
-        summary_data_file.write("\n\t-> unmapped reads count : "+str(unmapped_count)+"\n")
+        summary_data_file.write("\n\t-> properly alined reads count : "+str(totallyMappedCount+partiallyMappedCount)+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/i))+"% of total reads)")
+        summary_data_file.write("\n\t\t-> totally mapped reads count : "+str(totallyMappedCount))
+        summary_data_file.write("\n\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
+        summary_data_file.write("\n\t-> unmapped reads count : "+str(unmappedCount)+"\n")
 
-    vtotal = 0
-    for v in dicoCigar:
-        vtotal += dicoCigar[v]
-    for w in dicoCigar.keys():
-        dicoCigar[w] = round((dicoCigar[w]*100)/vtotal, 2)
-
-    if options != 0:
-        summary_data_file.write("\n**********************************\nGlobal CIGAR mutations observed on well-aligned sequences:\n\n"
-                        +"Alignment Match : "+str(round(dicoCigar['M'],2))+"%\n"
-                        +"Insertion : "+str(round(dicoCigar['I'],2))+"%\n"
-                        +"Deletion : "+str(round(dicoCigar['D'],2))+"%\n"
-                        +"Skipped region : "+str(round(dicoCigar['S'],2))+"%\n"
-                        +"Soft Clipping : "+str(round(dicoCigar['H'],2))+"%\n"
-                        +"Hard Clipping : "+str(round(dicoCigar['N'],2))+"%\n"
-                        +"Padding : "+str(round(dicoCigar['P'],2))+"%\n"
-                        +"Sequence Match : "+str(round(dicoCigar['X'],2))+"%\n"
-                        +"Sequence Mismatch : "+str(round(dicoCigar['='],2))+"%\n")
-        print(Fore.YELLOW+"\nSummary file for "+str(sys.argv[samFile])+" created."+Fore.RESET)
+    if option != "t":
+        summary_data_file.write("\n**********************************\nGlobal CIGAR mutations observed on well-alined sequences:\n\n"
+                        +"Alignment Match : "+str(dicoCigar['M'])+"%\n"
+                        +"Insertion : "+str(dicoCigar['I'])+"%\n"
+                        +"Deletion : "+str(dicoCigar['D'])+"%\n"
+                        +"Skipped region : "+str(dicoCigar['N'])+"%\n"
+                        +"Soft Clipping : "+str(dicoCigar['S'])+"%\n"
+                        +"Hard Clipping : "+str(dicoCigar['H'])+"%\n"
+                        +"Padding : "+str(dicoCigar['P'])+"%\n"
+                        +"Sequence Match : "+str(dicoCigar['='])+"%\n"
+                        +"Sequence Mismatch : "+str(dicoCigar['X'])+"%\n")
+        print(Fore.YELLOW+"\nSummary file for "+str(ARGUMENTS_LIST[samFileNumber])+" created."+Fore.RESET)
         summary_data_file.close()
 
-    if options != 0 and len(sys.argv[-fileNumber+samFile-1]) > 2:
-        os.rename("summary_data_file"+str(samFile)+".txt", sys.argv[-fileNumber+samFile-1])
+    if option != "t" and len(ARGUMENTS_LIST[-fileNumber + samFileNumber]) > 2:
+        os.rename("summary_data_file"+str(samFileNumber)+".txt", ARGUMENTS_LIST[-fileNumber + samFileNumber])
 
-    if options == 0 or options == 1:
+    if option != "o":
         print("\ntotal reads count : "+str(i))
-        print("\t-> properly aligned reads count : "+Fore.GREEN+str(totally_mapped_count+partially_mapped_count)+Fore.RESET+" ("+str(round((totally_mapped_count+partially_mapped_count)*100/i))+"% of total reads)")
-        print("\t\t-> totally mapped reads count : "+str(totally_mapped_count))
-        print("\t\t-> partially mapped reads count : "+str(partially_mapped_count))
-        print("\t-> unmapped reads count : "+str(unmapped_count))
-        print("\nCIGAR analysis (percentages of total properly aligned reads):\n"
-                    +"Alignment Match : "+str(round(dicoCigar['M'],2))+"%\n"
-                    +"Insertion : "+str(round(dicoCigar['I'],2))+"%\n"
-                    +"Deletion : "+str(round(dicoCigar['D'],2))+"%\n"
-                    +"Skipped region : "+str(round(dicoCigar['S'],2))+"%\n"
-                    +"Soft Clipping : "+str(round(dicoCigar['H'],2))+"%\n"
-                    +"Hard Clipping : "+str(round(dicoCigar['N'],2))+"%\n"
-                    +"Padding : "+str(round(dicoCigar['P'],2))+"%\n"
-                    +"Sequence Match : "+str(round(dicoCigar['X'],2))+"%\n"
-                    +"Sequence Mismatch : "+str(round(dicoCigar['='],2))+"%\n")
+        print("\t-> properly alined reads count : "+Fore.GREEN+str(totallyMappedCount+partiallyMappedCount)+Fore.RESET+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/i))+"% of total reads)")
+        print("\t\t-> totally mapped reads count : "+str(totallyMappedCount))
+        print("\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
+        print("\t-> unmapped reads count : "+str(unmappedCount))
+        print("\nCIGAR analysis (percentages of total properly alined reads):\n"
+                    +"Alignment Match : "+str(dicoCigar['M'])+"%\n"
+                    +"Insertion : "+str(dicoCigar['I'])+"%\n"
+                    +"Deletion : "+str(dicoCigar['D'])+"%\n"
+                    +"Skipped region : "+str(dicoCigar['N'])+"%\n"
+                    +"Soft Clipping : "+str(dicoCigar['S'])+"%\n"
+                    +"Hard Clipping : "+str(dicoCigar['H'])+"%\n"
+                    +"Padding : "+str(dicoCigar['P'])+"%\n"
+                    +"Sequence Match : "+str(dicoCigar['='])+"%\n"
+                    +"Sequence Mismatch : "+str(dicoCigar['X'])+"%\n")
+
+def main(ARGUMENTS_LIST):
+    help()
+    fileNumber = inputFileNumber(ARGUMENTS_LIST)
+    option = userOptionChoice(fileNumber)
+    for samFileNumber in range(1,fileNumber):
+        checkFileIntegrity(samFileNumber)
+        file = fileHandler(samFileNumber)
+        fileAnalysis(file, option, samFileNumber, fileNumber)
+
+if __name__ == "__main__":
+    main(sys.argv)
