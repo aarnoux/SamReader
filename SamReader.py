@@ -7,7 +7,7 @@ __version__ = "0.0.1"
 __date__ = "12/14/2021"
 __licence__ ="This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>."
         
-import os, sys, csv, re, colorama, numpy
+import os, sys, csv, re, colorama, numpy, pandas as pd
 from colorama import Fore, Back
 
 # Matrices
@@ -29,6 +29,7 @@ headers = ('@HD','@SQ','@RG','@PG','@CO')
 # Constantes
 ARGUMENTS_LIST = sys.argv
 SCRIPT_CALL = 1
+MIN_LINE_LENGHT = 11
 
 # augmentation de la taille max des champs dans le fichier csv afin de pouvoir analyser des alignements de reads > 131kb
 csv.field_size_limit(sys.maxsize)
@@ -149,7 +150,8 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
     partiallyMappedCount = 0
     totallyMappedCount = 0
     dicoCigar = {'M':0,'I':0,'D':0,'S':0,'H':0,'N':0,'P':0,'X':0,'=':0}
-    mutIndex = {}
+    nucleotideNb = []
+    mutation = []
 
     if option != "t":
         summary_data_file = open("summary_data_file"+str(samFileNumber)+".txt", "w")
@@ -243,16 +245,17 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                         temp = champsCigar[champ]
                         dicoCigar[temp[-1]] += int(temp[:(len(temp)-1)])
 
-                    if len(line)-11 != 0:
-                            for c in range(11,len(line)):
-                                pointerSeq = 0
-                                if line[c][:5] == "MD:Z:" and re.match('(?![0-9]+$)', line[c][5:]):
-                                        mutations = re.findall('[0-9]+\D', line[c])
-                                        for m in range(len(mutations)):
-                                            matchNb = int(mutations[m][:-1])
-                                            mutIndex[int(line[3])+pointerSeq+matchNb] = str(line[9][pointerSeq+matchNb])+"->"+str(mutations[m][-1])
-                                            pointerSeq += matchNb+1
-
+                    if len(line)-MIN_LINE_LENGHT > 0:
+                        for c in range(MIN_LINE_LENGHT,len(line)):
+                            pointerSeq = 0
+                            if line[c][:5] == "MD:Z:" and re.match('(?![0-9]+$)', line[c][5:]):
+                                mutations = re.findall('[0-9]+\D', line[c])
+                                for m in range(len(mutations)):
+                                    matchNb = int(mutations[m][:-1])
+                                    nucleotideNb.append(int(line[3])+pointerSeq+matchNb)
+                                    mutation.append(str(line[9][pointerSeq+matchNb])+" -> "+str(mutations[m][-1]))
+                                    pointerSeq += matchNb
+            
             elif researchQuery == False:
                 researchQuery = True
                 errorSearch = input(Back.RED+"Document non analysable"+Back.RESET+" : "+str(ERROR_COUNT)+" erreur(s) d'expressions régulières trouvée(s) à la line "+str(i)+", souhaitez-vous rechercher les erreurs dans le reste du fichier ?\ny/n\n")
@@ -276,8 +279,7 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
         summary_data_file.write("\n\t\t-> totally mapped reads count : "+str(totallyMappedCount))
         summary_data_file.write("\n\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
         summary_data_file.write("\n\t-> unmapped reads count : "+str(unmappedCount)+"\n")
-
-    if option != "t":
+        
         summary_data_file.write("\n**********************************\nGlobal CIGAR mutations observed on well-alined sequences:\n\n"
                         +"Alignment Match : "+str(dicoCigar['M'])+"%\n"
                         +"Insertion : "+str(dicoCigar['I'])+"%\n"
@@ -288,8 +290,14 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                         +"Padding : "+str(dicoCigar['P'])+"%\n"
                         +"Sequence Match : "+str(dicoCigar['='])+"%\n"
                         +"Sequence Mismatch : "+str(dicoCigar['X'])+"%\n")
+    
+        summary_data_file.write("\n**********************************\nList of found mutations :\n\nNucleotide N°\tMutation\n-------------------------\n")
+        for x in range(len(mutation)):
+            summary_data_file.write(str(nucleotideNb[x])+"\t\t"+str(mutation[x])+"\n")
+
         print(Fore.YELLOW+"\nSummary file for "+str(ARGUMENTS_LIST[samFileNumber])+" created."+Fore.RESET)
-        summary_data_file.close()
+
+    summary_data_file.close()
 
     if option != "t" and len(ARGUMENTS_LIST[-fileNumber + samFileNumber]) > 2:
         os.rename("summary_data_file"+str(samFileNumber)+".txt", ARGUMENTS_LIST[-fileNumber + samFileNumber])
