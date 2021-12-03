@@ -42,6 +42,7 @@ in one go. Results are either shown in the terminal or written in an output file
 - Verifying the integrity of the files given as arguments.
 - Reads that are unmapped are not taken into account for the calculations.
 - Calculations for the percentages of mutations are based on the CIGAR field.
+- Mutation list is only available with the '-o' or '-t -o' options.
 
 
 **** EXECUTION ****
@@ -85,7 +86,7 @@ $ ~/path/to/file/SamReader.py -hp
 
 **** OUTPUT ****
 
-The output is the same weither you choose to store it or not and is presented as follow :
+The output is presented as follow, it is the same for terminal or file output, except for "List of found mutations :" that is only available in the fil output :
 
 
 Informations :							       
@@ -107,25 +108,24 @@ total reads count : 351331						 |
 								         |
 **********************************			      	
 Global cigar mutation observed on well-aligned sequences:	  |
+								  | 	
 								  |
-Raw number of mutations:					  |
-Alignment Match : 34999647					  |
-Insertion : 18							  |
-Deletion : 61							  |
-Skipped region : 135						  |
-Soft Clipping : 0						  |
-Hard Clipping : 0						  |
-Padding : 0							  |
-Sequence Match : 0						  |	mutations informations
-Sequence Mismatch : 0						  | 	deducted from the CIGAR field
-								  | 
 Percentages:							  |
 Alignment Match : 100.0%					  |
 Insertion : 0.0%						  |
-Deletion : 0.0%							  |
-Skipped region : 0.0%						  |
+Deletion : 0.0%							  |	mutations informations
+Skipped region : 0.0%						  |	deducted from the CIGAR field
 Soft Clipping : 0.0%						  |
 Hard Clipping : 0.0%						  |
 Padding : 0.0%							  |
 Sequence Match : 0.0%						  |
 Sequence Mismatch : 0.0%				          |
+
+**********************************
+List of found mutations :				|
+							|
+Nucleotide N°	Mutation				|
+-------------------------				|	mutations position information in reference sequence and
+402794		A -> G					|	nucleotidic modifications
+402837		A -> T					|
+402848		A -> G					|
