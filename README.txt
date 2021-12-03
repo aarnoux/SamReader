@@ -125,7 +125,7 @@ Sequence Mismatch : 0.0%				          |
 List of found mutations :				|
 							|
 Nucleotide N°	Mutation				|
--------------------------				|	mutations position information in reference sequence and
-402794		A -> G					|	nucleotidic modifications
+-------------------------				|	mutations position information in reference
+402794		A -> G					|	sequence and nucleotidic modifications
 402837		A -> T					|
 402848		A -> G					|
