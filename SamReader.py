@@ -7,7 +7,7 @@ __version__ = "0.0.1"
 __date__ = "12/14/2021"
 __licence__ ="This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>."
         
-import os, sys, csv, re, colorama, numpy, pandas as pd
+import os, sys, csv, re, colorama, numpy
 from colorama import Fore, Back
 
 # Matrices
@@ -238,23 +238,26 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
 
                     # dans le CIGAR, vérifier qu'il n'y a pas 100% de match (= read partiellement mappé)
                     if re.match('(?![0-9]+M$)', line[5]): partiallyMappedCount += 1 
-                    else: totallyMappedCount +=1
+                    else:
+                        totallyMappedCount +=1
+                        if len(line)-MIN_LINE_LENGHT > 0:
+                            for c in range(MIN_LINE_LENGHT,len(line)):
+                                pointerSeq = 0
+                                if line[c][:5] == "MD:Z:" and re.match('(?![0-9]+$)', line[c][5:]):
+                                    mutations = re.findall('[0-9]+\D', line[c])
+                                    for m in range(len(mutations)):
+                                        matchNb = int(mutations[m][:-1])
+                                        if int(line[8]) < 0:
+                                            nucleotideNb.append(int(line[3])-pointerSeq-matchNb)
+                                        else:
+                                            nucleotideNb.append(int(line[3])+pointerSeq+matchNb)
+                                        mutation.append(str(line[9][pointerSeq+matchNb])+" -> "+str(mutations[m][-1]))
+                                        pointerSeq += matchNb
 
                     champsCigar = re.findall('[0-9]+\D', line[5])
                     for champ in range(len(champsCigar)):
                         temp = champsCigar[champ]
                         dicoCigar[temp[-1]] += int(temp[:(len(temp)-1)])
-
-                    if len(line)-MIN_LINE_LENGHT > 0:
-                        for c in range(MIN_LINE_LENGHT,len(line)):
-                            pointerSeq = 0
-                            if line[c][:5] == "MD:Z:" and re.match('(?![0-9]+$)', line[c][5:]):
-                                mutations = re.findall('[0-9]+\D', line[c])
-                                for m in range(len(mutations)):
-                                    matchNb = int(mutations[m][:-1])
-                                    nucleotideNb.append(int(line[3])+pointerSeq+matchNb)
-                                    mutation.append(str(line[9][pointerSeq+matchNb])+" -> "+str(mutations[m][-1]))
-                                    pointerSeq += matchNb
             
             elif researchQuery == False:
                 researchQuery = True
@@ -291,9 +294,9 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                         +"Sequence Match : "+str(dicoCigar['='])+"%\n"
                         +"Sequence Mismatch : "+str(dicoCigar['X'])+"%\n")
     
-        summary_data_file.write("\n**********************************\nList of found mutations :\n\nNucleotide N°\tMutation\n-------------------------\n")
+        summary_data_file.write("\n**********************************\nList of substitutions in totally mapped reads :\n\nNucleotide N°\t\tMutation\n----------------------------------\n")
         for x in range(len(mutation)):
-            summary_data_file.write(str(nucleotideNb[x])+"\t\t"+str(mutation[x])+"\n")
+            summary_data_file.write(str(nucleotideNb[x])+"\t\t\t"+str(mutation[x])+"\n")
 
         print(Fore.YELLOW+"\nSummary file for "+str(ARGUMENTS_LIST[samFileNumber])+" created."+Fore.RESET)
 
