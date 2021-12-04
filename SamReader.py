@@ -17,7 +17,7 @@ readGroup = numpy.array([['ID','BC','CN','DS','DT','FO','KS','LB','PG','PI','PL'
 program = numpy.array([['ID','PN','CL','PP','DS','VN'],['Program record identifier','Program name','Command line','Previous @PG-ID','Description','program version']])
 comments = numpy.array([['CO'],['Commentaire(s)']])
 
-# Dictionnaires
+# Dictionnary
 infoHeader = {0:headerLine,1:ReferenceSequenceDictionary,2:readGroup,3:program,4:comments,5:'Header line',6:'Reference sequence dictionary',7:'Read group',8:'Program',9:'Comments'}
 
 # Regex
@@ -26,15 +26,19 @@ regex = re.compile('^[0-9A-Za-z!#$%&+./:;?@^_|~-][0-9A-Za-z!#$%&*+./:;=?@^_|~-]*
 # Tuple
 headers = ('@HD','@SQ','@RG','@PG','@CO')
 
-# Constantes
+# Constants
 ARGUMENTS_LIST = sys.argv
 SCRIPT_CALL = 1
 MIN_LINE_LENGHT = 11
 
-# augmentation de la taille max des champs dans le fichier csv afin de pouvoir analyser des alignements de reads > 131kb
+# Increasing the maximal size of csv fields in order to be able to analyze reads > 131kb
 csv.field_size_limit(sys.maxsize)
 
-def helpFLAG():
+#*****************
+#* HELP FUNCTION *
+#*****************
+
+def helpFlag():
     print("Bit\t\tDescription")
     print("----------------------------------------------------------------------")
     print("1\t0x1\ttemplate having multiple segments in sequencing")
@@ -93,18 +97,23 @@ def helpProgram():
     print("Choosing from one of the following options is MANDATORY :\n-t	show the results in the terminal, without saving them in a file\n-o	save the results in a file which name is given by the user, or in the default file 'summary_data_file.txt'\n-t -o	show the results int he terminal AND save them in a file")
     exit()
 
+# Help function analyses the input of the user and call the corresponding help function
 def help():
     helpQuery = "NULL"
-    if re.search("^-h[a-x]?$", sys.argv[1]):
+    if re.search("^-h[a-x]?$", sys.argv[1]): # Check if the user is calling the help function
         if sys.argv[1] == "-h":
-            print("What do you need help for ?")
-            print("FLAG field ? -hf \nCIGAR field ? -hc\nSystem requirements ? -hr\nSAM file ? -hs")
+            print("What do you need help with ?")
+            print("FLAG field ? -hf \nCIGAR field ? -hc\nSystem requirements ? -hr\nSAM file ? -hs\nSamReader ? -hp\n")
             helpQuery = input()
-        if sys.argv[1] == "-hf" or helpQuery == "-hf":helpFLAG()
+        if sys.argv[1] == "-hf" or helpQuery == "-hf":helpFlag()
         if sys.argv[1] == "-hc" or helpQuery == "-hc":helpCigar()
         if sys.argv[1] == "-hr" or helpQuery == "-hr":helpRequirements()
         if sys.argv[1] == "-hs" or helpQuery == "-hs":helpSAM()
         if sys.argv[1] == "-hp" or helpQuery == "-hp":helpProgram()
+
+#*****************
+#* FILE ANALYSIS *
+#*****************
 
 def inputFileNumber(ARGUMENTS_LIST):
     fileNumber = SCRIPT_CALL
@@ -155,7 +164,10 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
 
     if option != "t":
         summary_data_file = open("summary_data_file"+str(samFileNumber)+".txt", "w")
-        summary_data_file.write('Informations :\n\n')
+        summary_data_file.write(str(sys.argv[samFileNumber])+'\n\nInformations :\n\n')
+
+    if option == "t" or "t+o":
+        print("\n"+str(sys.argv[samFileNumber]))
 
     for line in file:
         i += 1
