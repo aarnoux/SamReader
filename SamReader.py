@@ -177,7 +177,7 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
 
     if option != "t":
         summary_data_file = open("summary_data_file"+str(samFileNumber)+".txt", "w")
-        summary_data_file.write(str(sys.argv[samFileNumber])+'\n\nInformations :\n\n')
+        summary_data_file.write(str(sys.argv[samFileNumber])+'\n\nInformations :\n')
 
     if option == "t" or "t+o":
         print("\nAnalyzing :\n"+Back.WHITE+Fore.BLACK+str(sys.argv[samFileNumber])+Fore.RESET+Back.RESET)
@@ -189,18 +189,17 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
         if line[0].startswith(headers) == True:
             for field in range(len(headers)):
                 if line[0] == headers[field]:
-                    if option == "t" or option == "t+o":
+                    if option != "o":
                         print("\n"+headers[field]+" - "+infoHeader[field+5])
-                    else:
-                        summary_data_file.write(headers[field]+" - "+infoHeader[field+5])
+                    elif option != "t":
+                        summary_data_file.write("\n"+headers[field]+" - "+infoHeader[field+5]+"\n")
                     for headerSubField in range(1,len(line)):
                         for m in range(len(infoHeader[field])):
                             if infoHeader[field][0,m] == line[headerSubField][:2]:
-                                if option == "t" or option == "t+o":
+                                if option != "o":
                                     print(str(infoHeader[field][1,m])+" : "+str(line[headerSubField][3:]))
                                 if option != "t":
-                                    summary_data_file.write(str(infoHeader[field][1,m])+" : "+str(line[headerSubField][3:]))
-                    if option != "t": summary_data_file.write("\n")
+                                    summary_data_file.write(str(infoHeader[field][1,m])+" : "+str(line[headerSubField][3:]+"\n"))
         else:
             # la recherche d'erreurs dans les champs débute par la recherche de l'expression régulière (RE) du champ, puis :
             # - si la RE est correcte on diminue le compteur 'ERROR_COUNT' de 1
@@ -298,7 +297,7 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
         exit()
 
     if option != "t":
-        summary_data_file.write("**********************************\ntotal reads count : "+str(i))
+        summary_data_file.write("\n**********************************\ntotal reads count : "+str(i))
         summary_data_file.write("\n\t-> aligned reads count : "+str(totallyMappedCount+partiallyMappedCount)+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/i))+"% of total reads)")
         summary_data_file.write("\n\t\t-> totally mapped reads count : "+str(totallyMappedCount))
         summary_data_file.write("\n\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
@@ -353,8 +352,10 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
             summary_data_file.write("No reads could be analyzed.")
         if option != "o": print(Fore.RED+"No reads could be analyzed"+Fore.RESET)
 
-    if option != "t" and len(ARGUMENTS_LIST[-1]) > 2:
+    if option == "o" and len(ARGUMENTS_LIST) > (fileNumber + samFileNumber) and len(ARGUMENTS_LIST[fileNumber + samFileNumber]) > 2:
         os.rename("summary_data_file"+str(samFileNumber)+".txt", ARGUMENTS_LIST[samFileNumber + fileNumber]+".txt")
+    elif option == "t+o" and len(ARGUMENTS_LIST) > (fileNumber + samFileNumber + 1) and len(ARGUMENTS_LIST[fileNumber + samFileNumber + 1]) > 2:
+        os.rename("summary_data_file"+str(samFileNumber)+".txt", ARGUMENTS_LIST[samFileNumber + fileNumber + 1]+".txt")
 
 def main(ARGUMENTS_LIST):
     help()
