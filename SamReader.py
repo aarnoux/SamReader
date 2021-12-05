@@ -34,9 +34,9 @@ MIN_LINE_LENGHT = 11
 # Increasing the maximal size of csv fields in order to be able to analyze reads > 131kb
 csv.field_size_limit(sys.maxsize)
 
-#*****************
-#* HELP FUNCTION *
-#*****************
+#******************
+#* HELP FUNCTIONS *
+#******************
 
 def helpFlag():
     print("Bit\t\tDescription")
@@ -115,22 +115,24 @@ def help():
 #* FILE ANALYSIS *
 #*****************
 
+# Function that returns the number of arguments given as input (sam files + script calling)
 def inputFileNumber(ARGUMENTS_LIST):
     fileNumber = SCRIPT_CALL
     for argument in range(len(ARGUMENTS_LIST)):
         if len(ARGUMENTS_LIST[argument]) > 2 and re.search('.sam$', ARGUMENTS_LIST[argument]): fileNumber += 1
     return fileNumber
 
+# Function that lets the user choose the output mode
 def userOptionChoice(fileNumber):
     option = "NULL"
-    if len(ARGUMENTS_LIST)-(fileNumber) <= 0:
+    if len(ARGUMENTS_LIST)-(fileNumber) <= 0:   # Not choosing any options ends the script
         if input("Error : no options were given, '-hp' for help about how to run the program.\n") == '-hp': helpProgram()
         else: exit()
-    if ARGUMENTS_LIST[fileNumber] == "-t": option = "t"
+    if ARGUMENTS_LIST[fileNumber] == "-t": option = "t" # -t means that the results will only be shown in the terminal
     if len(ARGUMENTS_LIST)-(fileNumber+1) > 0 and ARGUMENTS_LIST[fileNumber+1] == "-o": option = "t+o"
-    elif ARGUMENTS_LIST[fileNumber] == "-o": option = "o"
+    elif ARGUMENTS_LIST[fileNumber] == "-o": option = "o" # -o means that the results will only be saved in a file
     if option == "NULL":
-        if input("Option error : a non-authorized option was given, '-hp' for help about how to run the program.\n") == '-hp-': helpprogram()
+        if input("Option error : a non-authorized option was given, '-hp' for help about how to run the program.\n") == '-hp-': helpProgram()   # An unauthorized input ends the script
         else: exit()
     return option
 
@@ -151,6 +153,17 @@ def fileHandler(samFileNumber):
     fi.close
     return file
 
+def flagBinary(flag) :
+
+    flagB = bin(int(flag)) # Transform the integer into a binary.
+    flagB = flagB[2:] # Remove '0b' Example: '0b1001101' > '1001101'
+    flagB = list(flagB) 
+    if len(flagB) < 12: # Size adjustement to 12 (maximal flag size)
+        add = 12 - len(flagB) # We compute the difference between the maximal flag size (12) and the length of the binary flag.
+        for t in range(add):
+            flagB.insert(0,'0') # We insert 0 to complete until the maximal flag size.
+    return flagB
+
 def fileAnalysis(file, option, samFileNumber, fileNumber):
     i = 0
     researchQuery = False
@@ -167,7 +180,7 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
         summary_data_file.write(str(sys.argv[samFileNumber])+'\n\nInformations :\n\n')
 
     if option == "t" or "t+o":
-        print("\n"+str(sys.argv[samFileNumber]))
+        print("\nAnalyzing :\n"+Back.WHITE+Fore.BLACK+str(sys.argv[samFileNumber])+Fore.RESET+Back.RESET)
 
     for line in file:
         i += 1
@@ -179,14 +192,14 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                     if option == "t" or option == "t+o":
                         print("\n"+headers[field]+" - "+infoHeader[field+5])
                     else:
-                        summary_data_file.write(headers[field]+" - "+infoHeader[field+5]+"\n")
+                        summary_data_file.write(headers[field]+" - "+infoHeader[field+5])
                     for headerSubField in range(1,len(line)):
                         for m in range(len(infoHeader[field])):
                             if infoHeader[field][0,m] == line[headerSubField][:2]:
                                 if option == "t" or option == "t+o":
                                     print(str(infoHeader[field][1,m])+" : "+str(line[headerSubField][3:]))
                                 if option != "t":
-                                    summary_data_file.write(str(infoHeader[field][1,m])+" : "+str(line[headerSubField][3:])+"\n")
+                                    summary_data_file.write(str(infoHeader[field][1,m])+" : "+str(line[headerSubField][3:]))
                     if option != "t": summary_data_file.write("\n")
         else:
             # la recherche d'erreurs dans les champs débute par la recherche de l'expression régulière (RE) du champ, puis :
@@ -239,14 +252,14 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
 
             # si la line ne présente pas d'erreurs alors 'ERROR_COUNT' vaut 11
             if ERROR_COUNT == 0:
-                flag = bin(int(line[1]))
+                flag = flagBinary(line[1])
 
                 # si '0100' est présent dans le binaire ça correspond à un FLAG de 4 (= read non mappé)
                 if int(flag[-3]) == 1:
                     unmappedCount += 1
 
                 # si '0010' est présent dans le binaire ça correspond à un FLAG de 2 (= read bien aligné)
-                if int(flag[-2]) == 1:
+                if int(flag[-2]) == 1 or int(flag[-1]) == 0:
 
                     # dans le CIGAR, vérifier qu'il n'y a pas 100% de match (= read partiellement mappé)
                     if re.match('(?![0-9]+M$)', line[5]): partiallyMappedCount += 1 
@@ -284,18 +297,27 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
         print(Fore.YELLOW+"Fin de la recherche d'erreur."+Fore.RESET)
         exit()
 
-    totalValue = 0
-    for value in dicoCigar: totalValue += dicoCigar[value]
-    for key in dicoCigar.keys(): dicoCigar[key] = round((dicoCigar[key]*100/totalValue), 2)
-
     if option != "t":
         summary_data_file.write("**********************************\ntotal reads count : "+str(i))
-        summary_data_file.write("\n\t-> properly alined reads count : "+str(totallyMappedCount+partiallyMappedCount)+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/i))+"% of total reads)")
+        summary_data_file.write("\n\t-> aligned reads count : "+str(totallyMappedCount+partiallyMappedCount)+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/i))+"% of total reads)")
         summary_data_file.write("\n\t\t-> totally mapped reads count : "+str(totallyMappedCount))
         summary_data_file.write("\n\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
         summary_data_file.write("\n\t-> unmapped reads count : "+str(unmappedCount)+"\n")
-        
-        summary_data_file.write("\n**********************************\nGlobal CIGAR mutations observed on well-alined sequences:\n\n"
+
+    if option != "o":
+            print("\ntotal reads count : "+str(i))
+            print("\t-> aligned reads count : "+Fore.GREEN+str(totallyMappedCount+partiallyMappedCount)+Fore.RESET+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/i))+"% of total reads)")
+            print("\t\t-> totally mapped reads count : "+str(totallyMappedCount))
+            print("\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
+            print("\t-> unmapped reads count : "+str(unmappedCount))
+
+    if totallyMappedCount + partiallyMappedCount > 0:
+        totalValue = 0
+        for value in dicoCigar: totalValue += dicoCigar[value]
+        for key in dicoCigar.keys(): dicoCigar[key] = round((dicoCigar[key]*100/totalValue), 2)
+
+        if option != "t":
+            summary_data_file.write("\n**********************************\nGlobal CIGAR mutations observed on aligned sequences:\n\n"
                         +"Alignment Match : "+str(dicoCigar['M'])+"%\n"
                         +"Insertion : "+str(dicoCigar['I'])+"%\n"
                         +"Deletion : "+str(dicoCigar['D'])+"%\n"
@@ -305,34 +327,34 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                         +"Padding : "+str(dicoCigar['P'])+"%\n"
                         +"Sequence Match : "+str(dicoCigar['='])+"%\n"
                         +"Sequence Mismatch : "+str(dicoCigar['X'])+"%\n")
-    
-        summary_data_file.write("\n**********************************\nList of substitutions in totally mapped reads :\n\nNucleotide N°\t\tMutation\n----------------------------------\n")
-        for x in range(len(mutation)):
-            summary_data_file.write(str(nucleotideNb[x])+"\t\t\t"+str(mutation[x])+"\n")
+                                
+            summary_data_file.write("\n**********************************\nList of substitutions in totally mapped reads :\n\nNucleotide N°\t\tMutation\n----------------------------------\n")
+            for x in range(len(mutation)):
+                summary_data_file.write(str(nucleotideNb[x])+"\t\t\t"+str(mutation[x])+"\n")
 
-        print(Fore.YELLOW+"\nSummary file for "+str(ARGUMENTS_LIST[samFileNumber])+" created."+Fore.RESET)
+            print(Fore.YELLOW+"\nSummary file for "+str(ARGUMENTS_LIST[samFileNumber])+" created."+Fore.RESET)
 
-    summary_data_file.close()
+            summary_data_file.close()
+        
+        if option != "o":
+            print("\nCIGAR analysis (percentages of total aligned reads):\n"
+                        +"Alignment Match : "+str(dicoCigar['M'])+"%\n"
+                        +"Insertion : "+str(dicoCigar['I'])+"%\n"
+                        +"Deletion : "+str(dicoCigar['D'])+"%\n"
+                        +"Skipped region : "+str(dicoCigar['N'])+"%\n"
+                        +"Soft Clipping : "+str(dicoCigar['S'])+"%\n"
+                        +"Hard Clipping : "+str(dicoCigar['H'])+"%\n"
+                        +"Padding : "+str(dicoCigar['P'])+"%\n"
+                        +"Sequence Match : "+str(dicoCigar['='])+"%\n"
+                        +"Sequence Mismatch : "+str(dicoCigar['X'])+"%\n")
 
-    if option != "t" and len(ARGUMENTS_LIST[-fileNumber + samFileNumber]) > 2:
-        os.rename("summary_data_file"+str(samFileNumber)+".txt", ARGUMENTS_LIST[-fileNumber + samFileNumber])
+    else:
+        if option != "t":
+            summary_data_file.write("No reads could be analyzed.")
+        if option != "o": print(Fore.RED+"No reads could be analyzed"+Fore.RESET)
 
-    if option != "o":
-        print("\ntotal reads count : "+str(i))
-        print("\t-> properly alined reads count : "+Fore.GREEN+str(totallyMappedCount+partiallyMappedCount)+Fore.RESET+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/i))+"% of total reads)")
-        print("\t\t-> totally mapped reads count : "+str(totallyMappedCount))
-        print("\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
-        print("\t-> unmapped reads count : "+str(unmappedCount))
-        print("\nCIGAR analysis (percentages of total properly alined reads):\n"
-                    +"Alignment Match : "+str(dicoCigar['M'])+"%\n"
-                    +"Insertion : "+str(dicoCigar['I'])+"%\n"
-                    +"Deletion : "+str(dicoCigar['D'])+"%\n"
-                    +"Skipped region : "+str(dicoCigar['N'])+"%\n"
-                    +"Soft Clipping : "+str(dicoCigar['S'])+"%\n"
-                    +"Hard Clipping : "+str(dicoCigar['H'])+"%\n"
-                    +"Padding : "+str(dicoCigar['P'])+"%\n"
-                    +"Sequence Match : "+str(dicoCigar['='])+"%\n"
-                    +"Sequence Mismatch : "+str(dicoCigar['X'])+"%\n")
+    if option != "t" and len(ARGUMENTS_LIST[-1]) > 2:
+        os.rename("summary_data_file"+str(samFileNumber)+".txt", ARGUMENTS_LIST[samFileNumber + fileNumber]+".txt")
 
 def main(ARGUMENTS_LIST):
     help()
