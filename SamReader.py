@@ -136,6 +136,7 @@ def userOptionChoice(fileNumber):
         else: exit()
     return option
 
+# Function that checks that the argument being analyzed is a non-empty SAM file
 def checkFileIntegrity(samFileNumber):
     if os.path.isfile(ARGUMENTS_LIST[samFileNumber]) ==  False:
         print("File error : L'argument n'est pas un fichier.")
@@ -147,14 +148,15 @@ def checkFileIntegrity(samFileNumber):
         print("Format error : seul le format SAM est accepté.")
         exit()
 
+# Function that reads the SAM file as a csv file, with tabulations delimiters, and returns it to be analyzed 
 def fileHandler(samFileNumber):
     fi = open(ARGUMENTS_LIST[samFileNumber])
     file = csv.reader(fi, delimiter = '\t', quoting = csv.QUOTE_NONE)
     fi.close
     return file
 
+# Function that returns the FLAG once converted in binary
 def flagBinary(flag) :
-
     flagB = bin(int(flag)) # Transform the integer into a binary.
     flagB = flagB[2:] # Remove '0b' Example: '0b1001101' > '1001101'
     flagB = list(flagB) 
@@ -164,6 +166,7 @@ def flagBinary(flag) :
             flagB.insert(0,'0') # We insert 0 to complete until the maximal flag size.
     return flagB
 
+# Function that analyzes the file
 def fileAnalysis(file, option, samFileNumber, fileNumber):
     i = 0
     researchQuery = False
@@ -184,26 +187,28 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
 
     for line in file:
         i += 1
-        ERROR_COUNT = 11    # il y a 11 champs obligatoires dans un fichier SAM
+        ERROR_COUNT = 11    # 11 car il y a 11 champs obligatoires dans un fichier SAM
 
+        # A first sorting is made on whether or not the line is from the header section or not
         if line[0].startswith(headers) == True:
             for field in range(len(headers)):
-                if line[0] == headers[field]:
+                if line[0] == headers[field]:   # Identifying the main section title
                     if option != "o":
                         print("\n"+headers[field]+" - "+infoHeader[field+5])
                     elif option != "t":
                         summary_data_file.write("\n"+headers[field]+" - "+infoHeader[field+5]+"\n")
                     for headerSubField in range(1,len(line)):
                         for m in range(len(infoHeader[field])):
-                            if infoHeader[field][0,m] == line[headerSubField][:2]:
+                            if infoHeader[field][0,m] == line[headerSubField][:2]:  # Identifying subsections titles by browsing the first row of the relevant matrix
+                                # When the subsection is found, print or write the extended description from the second row of the relevant matrix, and the corresponding informations of the analyzed SAM file
                                 if option != "o":
                                     print(str(infoHeader[field][1,m])+" : "+str(line[headerSubField][3:]))
                                 if option != "t":
                                     summary_data_file.write(str(infoHeader[field][1,m])+" : "+str(line[headerSubField][3:]+"\n"))
         else:
-            # la recherche d'erreurs dans les champs débute par la recherche de l'expression régulière (RE) du champ, puis :
-            # - si la RE est correcte on diminue le compteur 'ERROR_COUNT' de 1
-            # - si la RE est incorrecte, on affiche un message d'erreur et on finit d'analyser la line
+            # Error searching begins by researching the regular expression (RE) from the fields, and then:
+            # - if the RE is correct, the counter 'ERROR_COUNT' is decreased by 1
+            # - if the RE is incorrect, an error message is printed but the line continues to be analyzed
             if (re.search('^[!-?A-~]{1,254}$', line[0])):
                 ERROR_COUNT -= 1
             else:
@@ -249,40 +254,41 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
             else:
                 print(Fore.RED+"QUAL field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ QUAL a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[10])+"\n"+str(line))
 
-            # si la line ne présente pas d'erreurs alors 'ERROR_COUNT' vaut 11
+            # if there is no errors on the line, ERROR_COUNT equals 0
             if ERROR_COUNT == 0:
-                flag = flagBinary(line[1])
+                flag = flagBinary(line[1])  # the flag is translated into binary
 
-                # si '0100' est présent dans le binaire ça correspond à un FLAG de 4 (= read non mappé)
+                # if '0100' is present in the flag field, it means that a '4' is in the flag (= unmapped read)
                 if int(flag[-3]) == 1:
                     unmappedCount += 1
 
-                # si '0010' est présent dans le binaire ça correspond à un FLAG de 2 (= read bien aligné)
+                # if '0010' is present in the flag field, it means that a '2' is in the flag (= properly aligned read)
                 if int(flag[-2]) == 1 or int(flag[-1]) == 0:
 
-                    # dans le CIGAR, vérifier qu'il n'y a pas 100% de match (= read partiellement mappé)
+                    # in the CIGAR field, extract the partially mapped reads
                     if re.match('(?![0-9]+M$)', line[5]): partiallyMappedCount += 1 
                     else:
                         totallyMappedCount +=1
-                        if len(line)-MIN_LINE_LENGHT > 0:
+                        if len(line)-MIN_LINE_LENGHT > 0:   # from the totally mapped reads, search for the optional "MD" field
                             for c in range(MIN_LINE_LENGHT,len(line)):
                                 pointerSeq = 0
-                                if line[c][:5] == "MD:Z:" and re.match('(?![0-9]+$)', line[c][5:]):
+                                if line[c][:5] == "MD:Z:" and re.match('(?![0-9]+$)', line[c][5:]): # check that the "MD" field is present and the sequence match is not 100%
                                     mutations = re.findall('[0-9]+\D', line[c])
                                     for m in range(len(mutations)):
-                                        matchNb = int(mutations[m][:-1])
+                                        matchNb = int(mutations[m][:-1])    # if so, extract all mutations
                                         if int(line[8]) < 0:
-                                            nucleotideNb.append(int(line[3])-pointerSeq-matchNb)
+                                            nucleotideNb.append(int(line[3])-pointerSeq-matchNb)    # if the mutation is on the complementary read, substract the mutation position from the beginning of the read alignement
                                         else:
-                                            nucleotideNb.append(int(line[3])+pointerSeq+matchNb)
-                                        mutation.append(str(line[9][pointerSeq+matchNb])+" -> "+str(mutations[m][-1]))
+                                            nucleotideNb.append(int(line[3])+pointerSeq+matchNb)    # if the mutation is on the forward read, add the mutation position to the beginning of the read alignement
+                                        mutation.append(str(line[9][pointerSeq+matchNb])+" -> "+str(mutations[m][-1]))  # find the nucleotide that was substitued
                                         pointerSeq += matchNb
 
-                    champsCigar = re.findall('[0-9]+\D', line[5])
+                    champsCigar = re.findall('[0-9]+\D', line[5])   # find all CIGAR information
                     for champ in range(len(champsCigar)):
                         temp = champsCigar[champ]
                         dicoCigar[temp[-1]] += int(temp[:(len(temp)-1)])
             
+            # if there are errors on the line, pass 1 time in the following condition
             elif researchQuery == False:
                 researchQuery = True
                 errorSearch = input(Back.RED+"Document non analysable"+Back.RESET+" : "+str(ERROR_COUNT)+" erreur(s) d'expressions régulières trouvée(s) à la line "+str(i)+", souhaitez-vous rechercher les erreurs dans le reste du fichier ?\ny/n\n")
@@ -292,6 +298,7 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                     print(Fore.RED+"Input error : arrêt du script"+Fore.RESET)
                     exit()
 
+    # if the user wanted to search the entire file, after the error search is complete exit the script
     if errorSearch == "y":
         print(Fore.YELLOW+"Fin de la recherche d'erreur."+Fore.RESET)
         exit()
@@ -310,6 +317,7 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
             print("\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
             print("\t-> unmapped reads count : "+str(unmappedCount))
 
+    # convert numerical values of the CIGAR field to percentages
     if totallyMappedCount + partiallyMappedCount > 0:
         totalValue = 0
         for value in dicoCigar: totalValue += dicoCigar[value]
@@ -352,11 +360,13 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
             summary_data_file.write("No reads could be analyzed.")
         if option != "o": print(Fore.RED+"No reads could be analyzed"+Fore.RESET)
 
+    # rename the output files if the user gave specific names
     if option == "o" and len(ARGUMENTS_LIST) > (fileNumber + samFileNumber) and len(ARGUMENTS_LIST[fileNumber + samFileNumber]) > 2:
         os.rename("summary_data_file"+str(samFileNumber)+".txt", ARGUMENTS_LIST[samFileNumber + fileNumber]+".txt")
     elif option == "t+o" and len(ARGUMENTS_LIST) > (fileNumber + samFileNumber + 1) and len(ARGUMENTS_LIST[fileNumber + samFileNumber + 1]) > 2:
         os.rename("summary_data_file"+str(samFileNumber)+".txt", ARGUMENTS_LIST[samFileNumber + fileNumber + 1]+".txt")
 
+# main function
 def main(ARGUMENTS_LIST):
     help()
     fileNumber = inputFileNumber(ARGUMENTS_LIST)
