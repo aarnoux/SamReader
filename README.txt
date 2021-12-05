@@ -42,7 +42,7 @@ in one go. Results are either shown in the terminal or written in an output file
 - Verifying the integrity of the files given as arguments.
 - Reads that are unmapped are not taken into account for the calculations.
 - Calculations for the percentages of mutations are based on the CIGAR field.
-- Mutation list is only available with the '-o' or '-t -o' options.
+- Mutations list is only available with the '-o' or '-t -o' options.
 
 
 **** EXECUTION ****
@@ -86,8 +86,10 @@ $ ~/path/to/file/SamReader.py -hp
 
 **** OUTPUT ****
 
-The output is presented as follow, it is the same for terminal or file output, except for "List of found mutations :" that is only available in the fil output :
+The output is presented as follow, it is the same for terminal or file output, except for "List of substitutions in totally mapped reads" that is only available in the file output :
 
+
+/home/alizee/mapping.sam						 |	file name and path
 
 Informations :							       
 									 |
@@ -107,7 +109,7 @@ total reads count : 351331						 |
 	-> unmapped reads count : 1315					 |
 								         |
 **********************************			      	
-Global cigar mutation observed on well-aligned sequences:	  |
+Global cigar mutation observed on aligned sequences:		  |
 								  | 	
 								  |
 Percentages:							  |
@@ -122,10 +124,10 @@ Sequence Match : 0.0%						  |
 Sequence Mismatch : 0.0%				          |
 
 **********************************
-List of found mutations :				|
+List of substitutions in totally mapped reads :		|
 							|
-Nucleotide N°	Mutation				|
--------------------------				|	mutations position information in reference
-402794		A -> G					|	sequence and nucleotidic modifications
-402837		A -> T					|
-402848		A -> G					|
+Nucleotide N°		Mutation			|
+---------------------------------			|	mutations position information in reference
+402794			A -> G				|	sequence and nucleotidic modifications
+402837			A -> T				|
+402848			A -> G				|
