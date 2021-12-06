@@ -262,7 +262,7 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                 if int(flag[-3]) == 1:
                     unmappedCount += 1
 
-                # if '0010' is present in the flag field, it means that a '2' is in the flag (= properly aligned read)
+                # if '0010' is present in the flag field, it means that a '2' is in the flag (= properly aligned read), a flag of 0 doesn't mean that the flag is unmapped so it has to be taken into account
                 if int(flag[-2]) == 1 or int(flag[-1]) == 0:
 
                     # in the CIGAR field, extract the partially mapped reads
@@ -354,6 +354,12 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                         +"Padding : "+str(dicoCigar['P'])+"%\n"
                         +"Sequence Match : "+str(dicoCigar['='])+"%\n"
                         +"Sequence Mismatch : "+str(dicoCigar['X'])+"%\n")
+
+            print("List of substitutions in totally mapped reads:\nNucleotide N°\t\tMutation\n----------------------------------")
+            for x in range(5):
+                print(str(nucleotideNb[x])+"\t\t\t"+str(mutation[x]))
+            print("...\nThe complete mutation list is available in the file output (-o) if selected.\n")
+
 
     else:
         if option != "t":
