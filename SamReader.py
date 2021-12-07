@@ -10,150 +10,153 @@ __licence__ ="This program is free software: you can redistribute it and/or modi
 import os, sys, csv, re, colorama, numpy
 from colorama import Fore, Back
 
-# Matrices
-headerLine = numpy.array([['VN','SO','GO','SS'],['Format version','Sorting order of alignments','Grouping of alignments','Sub-sorting order of alignments']])
-referenceSequenceDictionary = numpy.array([['SN','LN','AH','AN','AS','DS','M5','SP','TP','UR'],['Reference sequence name','Reference sequence length','Alternate locus','Alternative reference sequence names','Genome assembly identifier','Description','MD5 checksum of the sequence','Species','Molecule topology','URI of the sequence']])
-readGroup = numpy.array([['ID','BC','CN','DS','DT','FO','KS','LB','PG','PI','PL','PM','PU','SM'],['Read group identifier','Barcode sequence','Name of sequencing center','Description','Date the run was produced','Flow order','Array of nucleotide bases','Library','Processing programs','Predicted median insert size','Platform/technology','Platform model','Platform unit','Sample']])
-program = numpy.array([['ID','PN','CL','PP','DS','VN'],['Program record identifier','Program name','Command line','Previous @PG-ID','Description','program version']])
-comments = numpy.array([['CO'],['Commentaire(s)']])
-cigarMatrix = numpy.array([['M','I','D','N','S','H','P','=','X'],['Alignement Match','Insertion','Deletion','Skipped region','Soft Clipping','Hard Clipping','Padding','Sequence Match','Sequence Mismatch']])
-qScoreInterpret = numpy.array([['!','"','#','$','%','&','\'','(',')','\*','\+',',','-','\.','/','0','1','2','3','4','5','6','7','8','9',':',';','<','=','>','?','@','A','B','C','D','E','F','G','H','I'],['0','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40']])
+# Matrix
+mHEADER_LINE = numpy.array([['VN','SO','GO','SS'],['Format version','Sorting order of alignments','Grouping of alignments','Sub-sorting order of alignments']])
+mREF_SEQ_DICTIONARY = numpy.array([['SN','LN','AH','AN','AS','DS','M5','SP','TP','UR'],['Reference sequence name','Reference sequence length','Alternate locus','Alternative reference sequence names','Genome assembly identifier','Description','MD5 checksum of the sequence','Species','Molecule topology','URI of the sequence']])
+mREAD_GROUP = numpy.array([['ID','BC','CN','DS','DT','FO','KS','LB','PG','PI','PL','PM','PU','SM'],['Read group identifier','Barcode sequence','Name of sequencing center','Description','Date the run was produced','Flow order','Array of nucleotide bases','Library','Processing programs','Predicted median insert size','Platform/technology','Platform model','Platform unit','Sample']])
+mPROGRAM = numpy.array([['ID','PN','CL','PP','DS','VN'],['Program record identifier','Program name','Command line','Previous @PG-ID','Description','program version']])
+mCOMMENTS = numpy.array([['CO'],['Commentaire(s)']])
+mCIGAR_MATRIX = numpy.array([['M','I','D','N','S','H','P','=','X'],['Alignement Match','Insertion','Deletion','Skipped region','Soft Clipping','Hard Clipping','Padding','Sequence Match','Sequence Mismatch']])
+mQUAL_INTERPRET = numpy.array([['!','"','#','$','%','&','\'','(',')','*','+',',','-','.','/','0','1','2','3','4','5','6','7','8','9',':',';','<','=','>','?','@','A','B','C','D','E','F','G','H','I'],['0','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40']])
 
-# Dictionnary
-infoHeader = {0:headerLine,1:referenceSequenceDictionary,2:readGroup,3:program,4:comments,}
-infoHeaderTitle = {0:'Header line',1:'Reference sequence dictionary',2:'Read group',3:'Program',4:'Comments'}
+# Dictionary
+dHEADER_FIELD_CALL = {0:mHEADER_LINE,1:mREF_SEQ_DICTIONARY,2:mREAD_GROUP,3:mPROGRAM,4:mCOMMENTS}
+dHEADER_TITLE = {0:'Header line',1:'Reference sequence dictionary',2:'Read group',3:'Program',4:'Comments'}
 
-# Regex
-regex = re.compile('^[0-9A-Za-z!#$%&+./:;?@^_|~-][0-9A-Za-z!#$%&*+./:;=?@^_|~-]*$')
+# Regular expression compile
+rEXPRESSION = re.compile('^[0-9A-Za-z!#$%&+./:;?@^_|~-][0-9A-Za-z!#$%&*+./:;=?@^_|~-]*$')
 
 # Tuple
-headers = ('@HD','@SQ','@RG','@PG','@CO')
+tHEADERS = ('@HD','@SQ','@RG','@PG','@CO')
 
-# Constants
-ARGUMENTS_LIST = sys.argv
-SCRIPT_CALL = 1
-MIN_LINE_LENGHT = 11
+# Constant
+cARGUMENTS_LIST = sys.argv
+cSCRIPT_CALL = 1
+cMIN_LINE_LENGHT = 11
 
 # Increasing the maximal size of csv fields in order to be able to analyze reads > 131kb
 csv.field_size_limit(sys.maxsize)
 
-#******************
-#* HELP FUNCTIONS *
-#******************
-
+# Help functions
 def helpFlag():
-    print("Bit\t\tDescription")
-    print("----------------------------------------------------------------------")
-    print("1\t0x1\ttemplate having multiple segments in sequencing")
-    print("2\t0x2\teach segment properly aligned according to the aligner")
-    print("4\t0x4\tsegment unmapped")
-    print("8\t0x8\tnext segment in the template unmapped")
-    print("16\t0x10\tSEQ being reverse complemented")
-    print("32\t0x20\tSEQ of the next segment in the template being reverse complemented")
-    print("64\t0x40\tthe first segment in the template")
-    print("128\t0x80\tthe last segment in the template")
-    print("256\t0x100\tsecondary alignment")
-    print("512\t0x200\tnot passing filters, such as platform/vendor quality controls")
-    print("1024\t0x400\tPCR or optical duplicate")
-    print("2048\t0x800\tsupplementary alignment")
+    print("\nCombination of bitwise FLAGs. Each bit is explained in the following table:\n\n"
+            +"Bit\t\tDescription\n"
+            +"----------------------------------------------------------------------\n"
+            +"1\t0x1\ttemplate having multiple segments in sequencing\n"
+            +"2\t0x2\teach segment properly aligned according to the aligner\n"
+            +"4\t0x4\tsegment unmapped\n"
+            +"8\t0x8\tnext segment in the template unmapped\n"
+            +"16\t0x10\tSEQ being reverse complemented\n"
+            +"32\t0x20\tSEQ of the next segment in the template being reverse complemented\n"
+            +"64\t0x40\tthe first segment in the template\n"
+            +"128\t0x80\tthe last segment in the template\n"
+            +"256\t0x100\tsecondary alignment\n"
+            +"512\t0x200\tnot passing filters, such as platform/vendor quality controls\n"
+            +"1024\t0x400\tPCR or optical duplicate\n"
+            +"2048\t0x800\tsupplementary alignment")
     exit()
 
 def helpRequirements():
-    print("This program runs with "+Fore.RED+"python 3"+Fore.RESET+", and needs the following packages:")
-    print(Fore.YELLOW+"os\tsys\tcsv\tre\tnumpy\tcolorama"+Fore.RESET)
-    print("\nYou can install them using the following commands:")
-    print("conda install *package name*\nor\npip install *package name*")
+    print("\nThis program runs with "+Fore.RED+"python 3"+Fore.RESET+", and needs the following packages:\n"
+            +Fore.YELLOW+"os\tsys\tcsv\tre\tnumpy\tcolorama"+Fore.RESET+"\n"
+            +"You can install them using the following commands:\n\n"
+            +"$ conda install <package name>\nor\n$ pip install <package name>")
     exit()
 
 def helpCigar():
-    print("Op\tBAM\tDescription")
-    print("----------------------------------------------------------------------")
-    print("M\t0\talignment match (can be a sequence match or mismatch)")
-    print("I\t1\tinsertion to the reference")
-    print("D\t2\tdeletion from the reference)")
-    print("N\t3\tskipped region from the reference")
-    print("S\t4\tsoft clipping (clipped sequences present in SEQ)")
-    print("H\t5\thard clipping (clipped sequences NOT present in SEQ)")
-    print("P\t6\tpadding (silent deletion from padded reference)")
-    print("=\t7\tsequence match")
-    print("X\t8\tsequence mismatch")
+    print("\nThe CIGAR operations are given in the following table (set ‘*’ if unavailable):\n\n"
+            +"Op\tBAM\tDescription\n"
+            +"----------------------------------------------------------------------\n"
+            +"M\t0\talignment match (can be a sequence match or mismatch)\n"
+            +"I\t1\tinsertion to the reference\n"
+            +"D\t2\tdeletion from the reference)\n"
+            +"N\t3\tskipped region from the reference\n"
+            +"S\t4\tsoft clipping (clipped sequences present in SEQ)\n"
+            +"H\t5\thard clipping (clipped sequences NOT present in SEQ)\n"
+            +"P\t6\tpadding (silent deletion from padded reference)\n"
+            +"=\t7\tsequence match\n"
+            +"X\t8\tsequence mismatch")
     exit()
 
 def helpSAM():
-    print("Col\tField\tType\tRegex/Range\t\t\tDescription")
-    print("----------------------------------------------------------------------")
-    print("1\tQNAME\tString\t[!-?A-~]{1,254}\t\t\tQuery template NAME")
-    print("2\tFLAG\tInt\t[0,2e16 − 1]\t\t\tbitwise FLAG")
-    print("3\tRNAME\tString\t\*|[:rname:∧ *=][:rname:]*\tReference sequence NAME")
-    print("4\tPOS\tInt\t[0,2e31 − 1]\t\t\t1-based leftmost mapping POSition")
-    print("5\tMAPQ\tInt\t[0,2e8 − 1]\t\t\tMAPping Quality")
-    print("6\tCIGAR\tString\t\*|([0-9]+[MIDNSHPX=])+\t\tCIGAR string")
-    print("7\tRNEXT\tString\t\*|=|[:rname: *=][:rname:]*\tReference name of the mate/next read")
-    print("8\tPNEXT\tInt\t[0,2e31 − 1]\t\t\tPosition of the mate/next read")
-    print("9\tTLEN\tInt\t[−2e31 + 1,2e31 − 1]\t\tobserved Template LENgth")
-    print("10\tSEQ\tString\t\*|[A-Za-z=.]+\t\t\tsegment SEQuence")
-    print("11\tQUAL\tString\t[!-~]+\t\t\t\tASCII of Phred-scaled base QUALity+33")
+    print("\nSAM stands for Sequence Alignment/Map format. It is a TAB-delimited text format consisting of a header"
+            +"section, which is optional, and an alignment section. If present, the header must be prior to the alignments. "
+            +"Header lines start with ‘@’, while alignment lines do not. Each alignment line has 11 mandatory fields for "
+            +"essential alignment information such as mapping position, and variable number of optional fields for flexible "
+            +"or aligner specific information. Mandatory fields are presented in the following table :\n\n"
+            +"Col\tField\tType\tRegex/Range\t\t\tDescription\n"
+            +"----------------------------------------------------------------------\n"
+            +"1\tQNAME\tString\t[!-?A-~]{1,254}\t\t\tQuery template NAME\n"
+            +"2\tFLAG\tInt\t[0,2e16 − 1]\t\t\tbitwise FLAG\n"
+            +"3\tRNAME\tString\t\*|[:rname:∧ *=][:rname:]*\tReference sequence NAME\n"
+            +"4\tPOS\tInt\t[0,2e31 − 1]\t\t\t1-based leftmost mapping POSition\n"
+            +"5\tMAPQ\tInt\t[0,2e8 − 1]\t\t\tMAPping Quality\n"
+            +"6\tCIGAR\tString\t\*|([0-9]+[MIDNSHPX=])+\t\tCIGAR string\n"
+            +"7\tRNEXT\tString\t\*|=|[:rname: *=][:rname:]*\tReference name of the mate/next read\n"
+            +"8\tPNEXT\tInt\t[0,2e31 − 1]\t\t\tPosition of the mate/next read\n"
+            +"9\tTLEN\tInt\t[−2e31 + 1,2e31 − 1]\t\tobserved Template LENgth\n"
+            +"10\tSEQ\tString\t\*|[A-Za-z=.]+\t\t\tsegment SEQuence\n"
+            +"11\tQUAL\tString\t[!-~]+\t\t\t\tASCII of Phred-scaled base QUALity+33")
     exit()
 
 def helpProgram():
-    print("\nSamReader is a small program that analyses SAM files. It can analyse multiple files in one go.")
-    print("Choosing from one of the following options is MANDATORY :\n-t	show the results in the terminal, without saving them in a file\n-o	save the results in a file which name is given by the user, or in the default file 'summary_data_file.txt'\n-t -o	show the results int he terminal AND save them in a file")
+    print("\nSamReader is a small program that analyses SAM files. It takes one or more SAM file in input and gives an output either in a file or directly in the terminal. The syntaxe is as follow :\n"
+            +"$ /path/to/SamReader.py <input file 1> <input file 2> option <output file 1> <output file 2>\n\n"
+            +"Choosing from one of the following options is MANDATORY :\n"
+            +"-s	show the results in the terminal, without saving them in a file\n"
+            +"-o	save the results in a file which name is given by the user, or in the default file 'summary_data_file.txt'\n"
+            +"-s -o	show the results int he terminal AND save them in a file\n"
+            +"\nEnter "+Fore.YELLOW+"$ /path/to/SamReader.py -h"+Fore.RESET+" for help")
     exit()
 
-# Help function analyses the input of the user and call the corresponding help function
+# The help() function analyses the input of the user and call the corresponding help function
 def help():
     helpQuery = "NULL"
     if re.search("^-h[a-x]?$", sys.argv[1]): # Check if the user is calling the help function
         if sys.argv[1] == "-h":
-            print("What do you need help with ?")
-            print("FLAG field ? -hf \nCIGAR field ? -hc\nSystem requirements ? -hr\nSAM file ? -hs\nSamReader ? -hp\n")
-            helpQuery = input()
+            print("What do you need help with ?\nFLAG field ? -hf \nCIGAR field ? -hc\nSystem requirements ? -hr\nSAM file ? -hs\nSamReader ? -hp\n")
+            helpQuery = input("Please enter an option below:\n")
         if sys.argv[1] == "-hf" or helpQuery == "-hf":helpFlag()
         if sys.argv[1] == "-hc" or helpQuery == "-hc":helpCigar()
         if sys.argv[1] == "-hr" or helpQuery == "-hr":helpRequirements()
         if sys.argv[1] == "-hs" or helpQuery == "-hs":helpSAM()
         if sys.argv[1] == "-hp" or helpQuery == "-hp":helpProgram()
 
-#*****************
-#* FILE ANALYSIS *
-#*****************
-
-# Function that returns the number of arguments given as input (sam files + script calling)
-def inputFileNumber(ARGUMENTS_LIST):
-    fileNumber = SCRIPT_CALL
-    for argument in range(len(ARGUMENTS_LIST)):
-        if len(ARGUMENTS_LIST[argument]) > 2 and re.search('.sam$', ARGUMENTS_LIST[argument]): fileNumber += 1
+# Function that verifies that the files given in input are non-empty SAM files, and returns the number of said files
+def checkInput(cARGUMENTS_LIST):
+    fileNumber = cSCRIPT_CALL
+    for arguments in range(len(cARGUMENTS_LIST)):
+        if cARGUMENTS_LIST[arguments] == ("-s" or "-o"):    # extraction of the arguments index corresponding to the first option chosen
+            for file in range(1,arguments): # for files that are given as input (= put before the first option)
+                if os.path.isfile(cARGUMENTS_LIST[file]) ==  False:
+                    print("File error : the input is not a file.")
+                    exit()
+                elif cARGUMENTS_LIST[file].endswith(".sam") == False: 
+                    print("Format error : only SAM file format is accepted as input.")
+                    exit()
+                elif os.path.getsize(cARGUMENTS_LIST[file]) == 0:
+                    print("File error : the file is empty.")
+                    exit()
+                else: fileNumber += 1
     return fileNumber
 
 # Function that lets the user choose the output mode
 def userOptionChoice(fileNumber):
     option = "NULL"
-    if len(ARGUMENTS_LIST)-(fileNumber) <= 0:   # Not choosing any options ends the script
+    if len(cARGUMENTS_LIST)-(fileNumber) <= 0:   # not choosing any option returns an error
         if input("Error : no options were given, '-hp' for help about how to run the program.\n") == '-hp': helpProgram()
         else: exit()
-    if ARGUMENTS_LIST[fileNumber] == "-t": option = "t" # -t means that the results will only be shown in the terminal
-    if len(ARGUMENTS_LIST)-(fileNumber+1) > 0 and ARGUMENTS_LIST[fileNumber+1] == "-o": option = "t+o"
-    elif ARGUMENTS_LIST[fileNumber] == "-o": option = "o" # -o means that the results will only be saved in a file
+    if cARGUMENTS_LIST[fileNumber] == "-s": option = "s" # -s means that the results will only be shown in the terminal
+    if len(cARGUMENTS_LIST)-(fileNumber+1) > 0 and cARGUMENTS_LIST[fileNumber+1] == "-o": option = "s+o"
+    elif cARGUMENTS_LIST[fileNumber] == "-o": option = "o" # -o means that the results will only be saved in a file
     if option == "NULL":
         if input("Option error : a non-authorized option was given, '-hp' for help about how to run the program.\n") == '-hp': helpProgram()   # An unauthorized input ends the script
         else: exit()
     return option
 
-# Function that checks that the argument being analyzed is a non-empty SAM file
-def checkFileIntegrity(samFileNumber):
-    if os.path.isfile(ARGUMENTS_LIST[samFileNumber]) ==  False:
-        print("File error : L'argument n'est pas un fichier.")
-        exit()
-    elif os.path.getsize(ARGUMENTS_LIST[samFileNumber]) == 0:
-        print("File error : Le fichier est vide.")
-        exit()
-    elif ARGUMENTS_LIST[samFileNumber].endswith(".sam") == False: 
-        print("Format error : seul le format SAM est accepté.")
-        exit()
-
 # Function that reads the SAM file as a csv file, with tabulations delimiters, and returns it to be analyzed 
 def fileHandler(samFileNumber):
-    fi = open(ARGUMENTS_LIST[samFileNumber])
+    fi = open(cARGUMENTS_LIST[samFileNumber])
     file = csv.reader(fi, delimiter = '\t', quoting = csv.QUOTE_NONE)
     fi.close
     return file
@@ -171,24 +174,24 @@ def flagBinary(flag) :
 
 # Function that analyzes the file
 def fileAnalysis(file, option, samFileNumber, fileNumber):
+    # Variables that need to be reinitialized for each file
     i = 0
-    HEADER_COUNT = 0
-    researchQuery = False
-    errorSearch = "NULL"
+    headerCount = 0
     unmappedCount = 0
     partiallyMappedCount = 0
     totallyMappedCount = 0
+    researchQuery = False
+    errorSearch = "NULL"
     nucleotideNb = []
     mutation = []
     qScore = []
-    substitutions = {}
+    dicoSubstitutions = {}
     dicoCigar = {}
 
-    if option != "t":
-        summary_data_file = open("summary_data_file"+str(samFileNumber)+".txt", "w")
-        summary_data_file.write(str(sys.argv[samFileNumber])+'\n\nInformations :\n')
-
-    if option == "t" or "t+o":
+    if option != "s":
+        outputFile = open("outputFile"+str(samFileNumber)+".txt", "w")
+        outputFile.write(str(sys.argv[samFileNumber])+'\n\nInformations :\n')
+    if option != "o":
         print("\nAnalyzing :\n"+Back.WHITE+Fore.BLACK+str(sys.argv[samFileNumber])+Fore.RESET+Back.RESET)
 
     for line in file:
@@ -196,23 +199,23 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
         ERROR_COUNT = 11    # 11 car il y a 11 champs obligatoires dans un fichier SAM
 
         # A first sorting is made on whether or not the line is from the header section or not
-        if line[0].startswith(headers) == True:
-            HEADER_COUNT += 1
-            for field in range(len(headers)):
-                if line[0] == headers[field]:   # Identifying the main section title
+        if line[0].startswith(tHEADERS) == True:
+            headerCount += 1
+            for field in range(len(tHEADERS)):
+                if line[0] == tHEADERS[field]:   # Identifying the main section title
                     if option != "o":
-                        print("\n"+headers[field]+" - "+infoHeaderTitle[field])
-                    elif option != "t":
-                        summary_data_file.write("\n"+headers[field]+" - "+infoHeaderTitle[field]+"\n")
+                        print("\n"+tHEADERS[field]+" - "+dHEADER_TITLE[field])
+                    elif option != "s":
+                        outputFile.write("\n"+tHEADERS[field]+" - "+dHEADER_TITLE[field]+"\n")
                     for headerSubField in range(1,len(line)):
-                        for m in range(len(infoHeader[field][0])):
-                            if infoHeader[field][0,m] == line[headerSubField][:2]:  # Identifying subsections titles by browsing the first row of the relevant matrix
+                        for m in range(len(dHEADER_FIELD_CALL[field][0])):
+                            if dHEADER_FIELD_CALL[field][0,m] == line[headerSubField][:2]:  # Identifying subsections titles by browsing the first row of the relevant matrix
                                 
                                 # When the subsection is found, print or write the extended description from the second row of the relevant matrix, and the corresponding informations of the analyzed SAM file
                                 if option != "o":
-                                    print(str(infoHeader[field][1,m])+" : "+str(line[headerSubField][3:]))
-                                if option != "t":
-                                    summary_data_file.write(str(infoHeader[field][1,m])+" : "+str(line[headerSubField][3:]+"\n"))
+                                    print(str(dHEADER_FIELD_CALL[field][1,m])+" : "+str(line[headerSubField][3:]))
+                                if option != "s":
+                                    outputFile.write(str(dHEADER_FIELD_CALL[field][1,m])+" : "+str(line[headerSubField][3:]+"\n"))
         else:
             # Error searching begins by researching the regular expression (RE) from the fields, and then:
             # - if the RE is correct, the counter 'ERROR_COUNT' is decreased by 1
@@ -225,7 +228,7 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                 ERROR_COUNT -= 1
             else:
                 print(Fore.RED+"FLAG field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ FLAG a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[1])+"\n"+str(line))
-            if (regex.search(line[2]) or re.search('\*', line[2])):
+            if (rEXPRESSION.search(line[2]) or re.search('\*', line[2])):
                 ERROR_COUNT -= 1
             else:
                 print(Fore.RED+"RNAME field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ RNAME a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[2])+"\n"+str(line))
@@ -241,7 +244,7 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                 ERROR_COUNT -= 1
             else:
                 print(Fore.RED+"CIGAR field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ CIGAR a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[5])+"\n"+str(line))                             
-            if (regex.search(line[6]) or re.search('^\*$', line[6]) or re.search('^=$', line[6])):
+            if (rEXPRESSION.search(line[6]) or re.search('^\*$', line[6]) or re.search('^=$', line[6])):
                 ERROR_COUNT -= 1
             else:
                 print(Fore.RED+"RNEXT field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ RNEXT a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[6])+"\n"+str(line))
@@ -277,8 +280,8 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                     if re.match('(?![0-9]+M$)', line[5]): partiallyMappedCount += 1 
                     else:
                         totallyMappedCount +=1
-                        if len(line)-MIN_LINE_LENGHT > 0:   # from the totally mapped reads, search for the optional "MD" field
-                            for c in range(MIN_LINE_LENGHT,len(line)):
+                        if len(line)-cMIN_LINE_LENGHT > 0:   # from the totally mapped reads, search for the optional "MD" field
+                            for c in range(cMIN_LINE_LENGHT,len(line)):
                                 pointerSeq = 0
                                 if line[c][:5] == "MD:Z:" and re.match('(?![0-9]+$)', line[c][5:]): # check that the "MD" field is present and the sequence match is not 100%
                                     mutations = re.findall('[0-9]+\D', line[c])
@@ -315,16 +318,16 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
         print(Fore.YELLOW+"Fin de la recherche d'erreur."+Fore.RESET)
         exit()
 
-    if option != "t":
-        summary_data_file.write("\n**********************************\ntotal reads count : "+str(i-HEADER_COUNT))
-        summary_data_file.write("\n\t-> aligned reads count : "+str(totallyMappedCount+partiallyMappedCount)+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/(i-HEADER_COUNT),2))+"% of total reads)")
-        summary_data_file.write("\n\t\t-> totally mapped reads count : "+str(totallyMappedCount))
-        summary_data_file.write("\n\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
-        summary_data_file.write("\n\t-> unmapped reads count : "+str(unmappedCount)+"\n")
+    if option != "s":
+        outputFile.write("\n**********************************\ntotal reads count : "+str(i-headerCount))
+        outputFile.write("\n\t-> aligned reads count : "+str(totallyMappedCount+partiallyMappedCount)+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/(i-headerCount),2))+"% of total reads)")
+        outputFile.write("\n\t\t-> totally mapped reads count : "+str(totallyMappedCount))
+        outputFile.write("\n\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
+        outputFile.write("\n\t-> unmapped reads count : "+str(unmappedCount)+"\n")
 
     if option != "o":
-            print("\ntotal reads count : "+str(i-HEADER_COUNT))
-            print("\t-> aligned reads count : "+Fore.GREEN+str(totallyMappedCount+partiallyMappedCount)+Fore.RESET+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/(i-HEADER_COUNT),2))+"% of total reads)")
+            print("\ntotal reads count : "+str(i-headerCount))
+            print("\t-> aligned reads count : "+Fore.GREEN+str(totallyMappedCount+partiallyMappedCount)+Fore.RESET+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/(i-headerCount),2))+"% of total reads)")
             print("\t\t-> totally mapped reads count : "+str(totallyMappedCount))
             print("\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
             print("\t-> unmapped reads count : "+str(unmappedCount))
@@ -334,58 +337,57 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
         totalValue = 0
         for value in dicoCigar: totalValue += dicoCigar[value]
 
-        if option != "t":
-            summary_data_file.write("\n**********************************\nGlobal CIGAR mutations observed on aligned sequences:\n\n")
+        if option != "s":
+            outputFile.write("\n**********************************\nGlobal CIGAR mutations observed on aligned sequences:\n\n")
             for key in dicoCigar.keys():
-                for x in range(len(cigarMatrix[0,])):
-                    if key == cigarMatrix[0,x]:
-                        summary_data_file.write(str(cigarMatrix[1,x])+" : "+str(round((dicoCigar[key]*100/totalValue), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(totalValue)+" mutations)")
+                for x in range(len(mCIGAR_MATRIX[0,])):
+                    if key == mCIGAR_MATRIX[0,x]:
+                        outputFile.write(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/totalValue), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(totalValue)+" mutations)")
 
-            summary_data_file.write("\n**********************************\nList of substitutions in totally mapped reads :\n\nNucleotide N°\t\tMutation\t\tBase call accuracy (%)\n----------------------------------------------------------------------\n")
+            outputFile.write("\n**********************************\nList of dicoSubstitutions in totally mapped reads :\n\nNucleotide N°\t\tMutation\t\tBase call accuracy (%)\n----------------------------------------------------------------------\n")
             for x in range(len(mutation)):
-                for qScoreValue in range(len(qScoreInterpret[0,])):
-                    if qScore[x] == qScoreInterpret[0,qScoreValue]:
-                        quality = int(qScoreInterpret[1,qScoreValue])
-                        summary_data_file.write(str(nucleotideNb[x])+"\t\t\t"+str(mutation[x])+"\t\t\t"+str(round((1-(10**(-quality/10)))*100,2))+"\n")
+                for qScoreValue in range(len(mQUAL_INTERPRET[0,])):
+                    if qScore[x] == mQUAL_INTERPRET[0,qScoreValue]:
+                        quality = int(mQUAL_INTERPRET[1,qScoreValue])
+                        outputFile.write(str(nucleotideNb[x])+"\t\t\t"+str(mutation[x])+"\t\t\t"+str(round((1-(10**(-quality/10)))*100,2))+"\n")
 
-            print(Fore.YELLOW+"\nSummary file for "+str(ARGUMENTS_LIST[samFileNumber])+" created."+Fore.RESET)
+            print(Fore.YELLOW+"\nSummary file for "+str(cARGUMENTS_LIST[samFileNumber])+" created."+Fore.RESET)
 
-            summary_data_file.close()
+            outputFile.close()
         
         if option != "o":
             print("\nMutations analysis:")
             for key in dicoCigar.keys():
-                for x in range(len(cigarMatrix[0,])):
-                    if key == cigarMatrix[0,x]:
-                        print(str(cigarMatrix[1,x])+" : "+str(round((dicoCigar[key]*100/totalValue), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(totalValue)+" mutations)")
+                for x in range(len(mCIGAR_MATRIX[0,])):
+                    if key == mCIGAR_MATRIX[0,x]:
+                        print(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/totalValue), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(totalValue)+" mutations)")
             for mut in mutation:
-                if mut in substitutions.keys():
-                    substitutions[mut] += 1
+                if mut in dicoSubstitutions.keys():
+                    dicoSubstitutions[mut] += 1
                 else:
-                    substitutions[mut] = 1
+                    dicoSubstitutions[mut] = 1
             print("\nSummary of nucleotide substitutions :\nSubstitution\t\tIteration\n------------------------------------")
-            for x in substitutions:
-                print(str(x)+"\t\t\t"+str(substitutions[x]))
+            for x in dicoSubstitutions:
+                print(str(x)+"\t\t\t"+str(dicoSubstitutions[x]))
 
     else:
-        if option != "t":
-            summary_data_file.write("No reads could be analyzed.")
+        if option != "s":
+            outputFile.write("No reads could be analyzed.")
         if option != "o": print(Fore.RED+"No reads could be analyzed"+Fore.RESET)
 
     # rename the output files if the user gave specific names
-    if option == "o" and len(ARGUMENTS_LIST) > (fileNumber + samFileNumber) and len(ARGUMENTS_LIST[fileNumber + samFileNumber]) > 2:
-        os.rename("summary_data_file"+str(samFileNumber)+".txt", ARGUMENTS_LIST[samFileNumber + fileNumber]+".txt")
-    elif option == "t+o" and len(ARGUMENTS_LIST) > (fileNumber + samFileNumber + 1) and len(ARGUMENTS_LIST[fileNumber + samFileNumber + 1]) > 2:
-        os.rename("summary_data_file"+str(samFileNumber)+".txt", ARGUMENTS_LIST[samFileNumber + fileNumber + 1]+".txt")
+    if option == "o" and len(cARGUMENTS_LIST) > (fileNumber + samFileNumber) and len(cARGUMENTS_LIST[fileNumber + samFileNumber]) > 2:
+        os.rename("summary_data_file"+str(samFileNumber)+".txt", cARGUMENTS_LIST[samFileNumber + fileNumber]+".txt")
+    elif option == "s+o" and len(cARGUMENTS_LIST) > (fileNumber + samFileNumber + 1) and len(cARGUMENTS_LIST[fileNumber + samFileNumber + 1]) > 2:
+        os.rename("summary_data_file"+str(samFileNumber)+".txt", cARGUMENTS_LIST[samFileNumber + fileNumber + 1]+".txt")
 
 # main function
-def main(ARGUMENTS_LIST):
-    if len(ARGUMENTS_LIST) == 1: helpProgram()
+def main(cARGUMENTS_LIST):
+    if len(cARGUMENTS_LIST) == 1: helpProgram()
     help()
-    fileNumber = inputFileNumber(ARGUMENTS_LIST)
+    fileNumber = checkInput(cARGUMENTS_LIST)
     option = userOptionChoice(fileNumber)
     for samFileNumber in range(1,fileNumber):
-        checkFileIntegrity(samFileNumber)
         file = fileHandler(samFileNumber)
         fileAnalysis(file, option, samFileNumber, fileNumber)
 
