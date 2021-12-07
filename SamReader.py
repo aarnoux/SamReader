@@ -6,20 +6,22 @@ __contact__ = ("alizee.arnoux@etu.umontpellier.fr")
 __version__ = "0.0.1"
 __date__ = "12/14/2021"
 __licence__ ="This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>."
-        
+
 import os, sys, csv, re, colorama, numpy
 from colorama import Fore, Back
 
 # Matrices
 headerLine = numpy.array([['VN','SO','GO','SS'],['Format version','Sorting order of alignments','Grouping of alignments','Sub-sorting order of alignments']])
-ReferenceSequenceDictionary = numpy.array([['SN','LN','AH','AN','AS','DS','M5','SP','TP','UR'],['Reference sequence name','Reference sequence length','Alternate locus','Alternative reference sequence names','Genome assembly identifier','Description','MD5 checksum of the sequence','Species','Molecule topology','URI of the sequence']])
+referenceSequenceDictionary = numpy.array([['SN','LN','AH','AN','AS','DS','M5','SP','TP','UR'],['Reference sequence name','Reference sequence length','Alternate locus','Alternative reference sequence names','Genome assembly identifier','Description','MD5 checksum of the sequence','Species','Molecule topology','URI of the sequence']])
 readGroup = numpy.array([['ID','BC','CN','DS','DT','FO','KS','LB','PG','PI','PL','PM','PU','SM'],['Read group identifier','Barcode sequence','Name of sequencing center','Description','Date the run was produced','Flow order','Array of nucleotide bases','Library','Processing programs','Predicted median insert size','Platform/technology','Platform model','Platform unit','Sample']])
 program = numpy.array([['ID','PN','CL','PP','DS','VN'],['Program record identifier','Program name','Command line','Previous @PG-ID','Description','program version']])
 comments = numpy.array([['CO'],['Commentaire(s)']])
 cigarMatrix = numpy.array([['M','I','D','N','S','H','P','=','X'],['Alignement Match','Insertion','Deletion','Skipped region','Soft Clipping','Hard Clipping','Padding','Sequence Match','Sequence Mismatch']])
+qScoreInterpret = numpy.array([['!','"','#','$','%','&','\'','(',')','\*','\+',',','-','\.','/','0','1','2','3','4','5','6','7','8','9',':',';','<','=','>','?','@','A','B','C','D','E','F','G','H','I'],['0','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40']])
 
 # Dictionnary
-infoHeader = {0:headerLine,1:ReferenceSequenceDictionary,2:readGroup,3:program,4:comments,5:'Header line',6:'Reference sequence dictionary',7:'Read group',8:'Program',9:'Comments'}
+infoHeader = {0:headerLine,1:referenceSequenceDictionary,2:readGroup,3:program,4:comments,}
+infoHeaderTitle = {0:'Header line',1:'Reference sequence dictionary',2:'Read group',3:'Program',4:'Comments'}
 
 # Regex
 regex = re.compile('^[0-9A-Za-z!#$%&+./:;?@^_|~-][0-9A-Za-z!#$%&*+./:;=?@^_|~-]*$')
@@ -178,6 +180,8 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
     totallyMappedCount = 0
     nucleotideNb = []
     mutation = []
+    qScore = []
+    substitutions = {}
     dicoCigar = {}
 
     if option != "t":
@@ -197,9 +201,9 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
             for field in range(len(headers)):
                 if line[0] == headers[field]:   # Identifying the main section title
                     if option != "o":
-                        print("\n"+headers[field]+" - "+infoHeader[field+5])
+                        print("\n"+headers[field]+" - "+infoHeaderTitle[field])
                     elif option != "t":
-                        summary_data_file.write("\n"+headers[field]+" - "+infoHeader[field+5]+"\n")
+                        summary_data_file.write("\n"+headers[field]+" - "+infoHeaderTitle[field]+"\n")
                     for headerSubField in range(1,len(line)):
                         for m in range(len(infoHeader[field][0])):
                             if infoHeader[field][0,m] == line[headerSubField][:2]:  # Identifying subsections titles by browsing the first row of the relevant matrix
@@ -285,7 +289,8 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                                         else:
                                             nucleotideNb.append(int(line[3])+pointerSeq+matchNb)    # if the mutation is on the forward read, add the mutation position to the beginning of the read alignement
                                         mutation.append(str(line[9][pointerSeq+matchNb])+" -> "+str(mutations[m][-1]))  # find the nucleotide that was substitued
-                                        pointerSeq += matchNb
+                                        qScore.append(str(line[10][pointerSeq+matchNb]))
+                                        pointerSeq += matchNb + 1
 
                     champsCigar = re.findall('[0-9]+\D', line[5])   # find all CIGAR information
                     for champ in range(len(champsCigar)):
@@ -332,13 +337,16 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
         if option != "t":
             summary_data_file.write("\n**********************************\nGlobal CIGAR mutations observed on aligned sequences:\n\n")
             for key in dicoCigar.keys():
-                for x in range(9):
-                    if key == cigarMatrix[1,x]:
-                        summary_data_file.write(str(dicoCigar[2,x])+" : "+str(dicoCigar[1,x]+"%\n"))
-    
-            summary_data_file.write("\n**********************************\nList of substitutions in totally mapped reads :\n\nNucleotide N°\t\tMutation\n----------------------------------\n")
+                for x in range(len(cigarMatrix[0,])):
+                    if key == cigarMatrix[0,x]:
+                        summary_data_file.write(str(cigarMatrix[1,x])+" : "+str(round((dicoCigar[key]*100/totalValue), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(totalValue)+" mutations)")
+
+            summary_data_file.write("\n**********************************\nList of substitutions in totally mapped reads :\n\nNucleotide N°\t\tMutation\t\tBase call accuracy (%)\n----------------------------------------------------------------------\n")
             for x in range(len(mutation)):
-                summary_data_file.write(str(nucleotideNb[x])+"\t\t\t"+str(mutation[x])+"\n")
+                for qScoreValue in range(len(qScoreInterpret[0,])):
+                    if qScore[x] == qScoreInterpret[0,qScoreValue]:
+                        quality = int(qScoreInterpret[1,qScoreValue])
+                        summary_data_file.write(str(nucleotideNb[x])+"\t\t\t"+str(mutation[x])+"\t\t\t"+str(round((1-(10**(-quality/10)))*100,2))+"\n")
 
             print(Fore.YELLOW+"\nSummary file for "+str(ARGUMENTS_LIST[samFileNumber])+" created."+Fore.RESET)
 
@@ -350,11 +358,14 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                 for x in range(len(cigarMatrix[0,])):
                     if key == cigarMatrix[0,x]:
                         print(str(cigarMatrix[1,x])+" : "+str(round((dicoCigar[key]*100/totalValue), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(totalValue)+" mutations)")
-    
-            print("\nList of substitutions in totally mapped reads:\nNucleotide N°\t\tMutation\n----------------------------------")
-            for x in range(5):
-                print(str(nucleotideNb[x])+"\t\t\t"+str(mutation[x]))
-            print("...\nThe complete mutation list is available in the file output (-o) if selected.\n")
+            for mut in mutation:
+                if mut in substitutions.keys():
+                    substitutions[mut] += 1
+                else:
+                    substitutions[mut] = 1
+            print("\nSummary of nucleotide substitutions :\nSubstitution\t\tIteration\n------------------------------------")
+            for x in substitutions:
+                print(str(x)+"\t\t\t"+str(substitutions[x]))
 
     else:
         if option != "t":
@@ -369,6 +380,7 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
 
 # main function
 def main(ARGUMENTS_LIST):
+    if len(ARGUMENTS_LIST) == 1: helpProgram()
     help()
     fileNumber = inputFileNumber(ARGUMENTS_LIST)
     option = userOptionChoice(fileNumber)
