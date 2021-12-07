@@ -16,6 +16,7 @@ ReferenceSequenceDictionary = numpy.array([['SN','LN','AH','AN','AS','DS','M5','
 readGroup = numpy.array([['ID','BC','CN','DS','DT','FO','KS','LB','PG','PI','PL','PM','PU','SM'],['Read group identifier','Barcode sequence','Name of sequencing center','Description','Date the run was produced','Flow order','Array of nucleotide bases','Library','Processing programs','Predicted median insert size','Platform/technology','Platform model','Platform unit','Sample']])
 program = numpy.array([['ID','PN','CL','PP','DS','VN'],['Program record identifier','Program name','Command line','Previous @PG-ID','Description','program version']])
 comments = numpy.array([['CO'],['Commentaire(s)']])
+cigarMatrix = numpy.array([['M','I','D','N','S','H','P','=','X'],['Alignement Match','Insertion','Deletion','Skipped region','Soft Clipping','Hard Clipping','Padding','Sequence Match','Sequence Mismatch']])
 
 # Dictionnary
 infoHeader = {0:headerLine,1:ReferenceSequenceDictionary,2:readGroup,3:program,4:comments,5:'Header line',6:'Reference sequence dictionary',7:'Read group',8:'Program',9:'Comments'}
@@ -132,7 +133,7 @@ def userOptionChoice(fileNumber):
     if len(ARGUMENTS_LIST)-(fileNumber+1) > 0 and ARGUMENTS_LIST[fileNumber+1] == "-o": option = "t+o"
     elif ARGUMENTS_LIST[fileNumber] == "-o": option = "o" # -o means that the results will only be saved in a file
     if option == "NULL":
-        if input("Option error : a non-authorized option was given, '-hp' for help about how to run the program.\n") == '-hp-': helpProgram()   # An unauthorized input ends the script
+        if input("Option error : a non-authorized option was given, '-hp' for help about how to run the program.\n") == '-hp': helpProgram()   # An unauthorized input ends the script
         else: exit()
     return option
 
@@ -169,14 +170,15 @@ def flagBinary(flag) :
 # Function that analyzes the file
 def fileAnalysis(file, option, samFileNumber, fileNumber):
     i = 0
+    HEADER_COUNT = 0
     researchQuery = False
     errorSearch = "NULL"
     unmappedCount = 0
     partiallyMappedCount = 0
     totallyMappedCount = 0
-    dicoCigar = {'M':0,'I':0,'D':0,'S':0,'H':0,'N':0,'P':0,'X':0,'=':0}
     nucleotideNb = []
     mutation = []
+    dicoCigar = {}
 
     if option != "t":
         summary_data_file = open("summary_data_file"+str(samFileNumber)+".txt", "w")
@@ -191,6 +193,7 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
 
         # A first sorting is made on whether or not the line is from the header section or not
         if line[0].startswith(headers) == True:
+            HEADER_COUNT += 1
             for field in range(len(headers)):
                 if line[0] == headers[field]:   # Identifying the main section title
                     if option != "o":
@@ -198,8 +201,9 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                     elif option != "t":
                         summary_data_file.write("\n"+headers[field]+" - "+infoHeader[field+5]+"\n")
                     for headerSubField in range(1,len(line)):
-                        for m in range(len(infoHeader[field])):
+                        for m in range(len(infoHeader[field][0])):
                             if infoHeader[field][0,m] == line[headerSubField][:2]:  # Identifying subsections titles by browsing the first row of the relevant matrix
+                                
                                 # When the subsection is found, print or write the extended description from the second row of the relevant matrix, and the corresponding informations of the analyzed SAM file
                                 if option != "o":
                                     print(str(infoHeader[field][1,m])+" : "+str(line[headerSubField][3:]))
@@ -263,7 +267,7 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                     unmappedCount += 1
 
                 # if '0010' is present in the flag field, it means that a '2' is in the flag (= properly aligned read), a flag of 0 doesn't mean that the flag is unmapped so it has to be taken into account
-                if int(flag[-2]) == 1 or int(flag[-1]) == 0:
+                else:
 
                     # in the CIGAR field, extract the partially mapped reads
                     if re.match('(?![0-9]+M$)', line[5]): partiallyMappedCount += 1 
@@ -286,7 +290,10 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                     champsCigar = re.findall('[0-9]+\D', line[5])   # find all CIGAR information
                     for champ in range(len(champsCigar)):
                         temp = champsCigar[champ]
-                        dicoCigar[temp[-1]] += int(temp[:(len(temp)-1)])
+                        if temp[-1] in dicoCigar.keys():
+                            dicoCigar[temp[-1]] += int(temp[:(len(temp)-1)])
+                        else:
+                            dicoCigar[temp[-1]] = int(temp[:(len(temp)-1)])
             
             # if there are errors on the line, pass 1 time in the following condition
             elif researchQuery == False:
@@ -304,15 +311,15 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
         exit()
 
     if option != "t":
-        summary_data_file.write("\n**********************************\ntotal reads count : "+str(i))
-        summary_data_file.write("\n\t-> aligned reads count : "+str(totallyMappedCount+partiallyMappedCount)+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/i))+"% of total reads)")
+        summary_data_file.write("\n**********************************\ntotal reads count : "+str(i-HEADER_COUNT))
+        summary_data_file.write("\n\t-> aligned reads count : "+str(totallyMappedCount+partiallyMappedCount)+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/(i-HEADER_COUNT),2))+"% of total reads)")
         summary_data_file.write("\n\t\t-> totally mapped reads count : "+str(totallyMappedCount))
         summary_data_file.write("\n\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
         summary_data_file.write("\n\t-> unmapped reads count : "+str(unmappedCount)+"\n")
 
     if option != "o":
-            print("\ntotal reads count : "+str(i))
-            print("\t-> aligned reads count : "+Fore.GREEN+str(totallyMappedCount+partiallyMappedCount)+Fore.RESET+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/i))+"% of total reads)")
+            print("\ntotal reads count : "+str(i-HEADER_COUNT))
+            print("\t-> aligned reads count : "+Fore.GREEN+str(totallyMappedCount+partiallyMappedCount)+Fore.RESET+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/(i-HEADER_COUNT),2))+"% of total reads)")
             print("\t\t-> totally mapped reads count : "+str(totallyMappedCount))
             print("\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
             print("\t-> unmapped reads count : "+str(unmappedCount))
@@ -321,20 +328,14 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
     if totallyMappedCount + partiallyMappedCount > 0:
         totalValue = 0
         for value in dicoCigar: totalValue += dicoCigar[value]
-        for key in dicoCigar.keys(): dicoCigar[key] = round((dicoCigar[key]*100/totalValue), 2)
 
         if option != "t":
-            summary_data_file.write("\n**********************************\nGlobal CIGAR mutations observed on aligned sequences:\n\n"
-                        +"Alignment Match : "+str(dicoCigar['M'])+"%\n"
-                        +"Insertion : "+str(dicoCigar['I'])+"%\n"
-                        +"Deletion : "+str(dicoCigar['D'])+"%\n"
-                        +"Skipped region : "+str(dicoCigar['N'])+"%\n"
-                        +"Soft Clipping : "+str(dicoCigar['S'])+"%\n"
-                        +"Hard Clipping : "+str(dicoCigar['H'])+"%\n"
-                        +"Padding : "+str(dicoCigar['P'])+"%\n"
-                        +"Sequence Match : "+str(dicoCigar['='])+"%\n"
-                        +"Sequence Mismatch : "+str(dicoCigar['X'])+"%\n")
-                                
+            summary_data_file.write("\n**********************************\nGlobal CIGAR mutations observed on aligned sequences:\n\n")
+            for key in dicoCigar.keys():
+                for x in range(9):
+                    if key == cigarMatrix[1,x]:
+                        summary_data_file.write(str(dicoCigar[2,x])+" : "+str(dicoCigar[1,x]+"%\n"))
+    
             summary_data_file.write("\n**********************************\nList of substitutions in totally mapped reads :\n\nNucleotide N°\t\tMutation\n----------------------------------\n")
             for x in range(len(mutation)):
                 summary_data_file.write(str(nucleotideNb[x])+"\t\t\t"+str(mutation[x])+"\n")
@@ -344,22 +345,16 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
             summary_data_file.close()
         
         if option != "o":
-            print("\nCIGAR analysis (percentages of total aligned reads):\n"
-                        +"Alignment Match : "+str(dicoCigar['M'])+"%\n"
-                        +"Insertion : "+str(dicoCigar['I'])+"%\n"
-                        +"Deletion : "+str(dicoCigar['D'])+"%\n"
-                        +"Skipped region : "+str(dicoCigar['N'])+"%\n"
-                        +"Soft Clipping : "+str(dicoCigar['S'])+"%\n"
-                        +"Hard Clipping : "+str(dicoCigar['H'])+"%\n"
-                        +"Padding : "+str(dicoCigar['P'])+"%\n"
-                        +"Sequence Match : "+str(dicoCigar['='])+"%\n"
-                        +"Sequence Mismatch : "+str(dicoCigar['X'])+"%\n")
-
-            print("List of substitutions in totally mapped reads:\nNucleotide N°\t\tMutation\n----------------------------------")
+            print("\nMutations analysis:")
+            for key in dicoCigar.keys():
+                for x in range(len(cigarMatrix[0,])):
+                    if key == cigarMatrix[0,x]:
+                        print(str(cigarMatrix[1,x])+" : "+str(round((dicoCigar[key]*100/totalValue), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(totalValue)+" mutations)")
+    
+            print("\nList of substitutions in totally mapped reads:\nNucleotide N°\t\tMutation\n----------------------------------")
             for x in range(5):
                 print(str(nucleotideNb[x])+"\t\t\t"+str(mutation[x]))
             print("...\nThe complete mutation list is available in the file output (-o) if selected.\n")
-
 
     else:
         if option != "t":
