@@ -47,6 +47,9 @@ in one go. Results are either shown in the terminal or written in an output file
 
 **** EXECUTION ****
 
+Add execution permission to the script:
+$ chmod +x ~/path/to/file/SamReader.py
+
 Run the following command in the terminal to execute SamReader (output file field is optionnal):
 $ ~/path/to/file/SamReader.py <input-file.sam> -options <output-file.txt>
 
