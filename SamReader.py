@@ -22,6 +22,7 @@ mQUAL_INTERPRET = numpy.array([['!','"','#','$','%','&','\'','(',')','*','+',','
 # Dictionary
 dHEADER_FIELD_CALL = {0:mHEADER_LINE,1:mREF_SEQ_DICTIONARY,2:mREAD_GROUP,3:mPROGRAM,4:mCOMMENTS}
 dHEADER_TITLE = {0:'Header line',1:'Reference sequence dictionary',2:'Read group',3:'Program',4:'Comments'}
+dCODONS = {"TTT":"Phe","TTC":"Phe","TTA":"Leu","TTG":"Leu","CTT":"Leu","CTC":"Leu","CTA":"Leu","CTG":"Leu","ATT":"Ile","ATC":"Ile","ATA":"Ile","ATG":"Met","GTT":"Val","GTC":"Val","GTA":"Val","GTG":"Val","TCT":"Ser","TCC":"Ser","TCA":"Ser","TCG":"Ser","CCT":"Pro","CCC":"Pro","CCA":"Pro","CCG":"Pro","ACT":"Thr","ACC":"Thr","ACA":"Thr","ACG":"Thr","GCT":"Ala","GCC":"Ala","GCA":"Ala","GCG":"Ala","TAT":"Tyr","TAC":"Tyr","TAA":"STOP","TAG":"STOP","CAT":"His","CAC":"His","CAA":"Gln","CAG":"Gln","AAT":"Asn","AAC":"Asn","AAA":"Lys","AAG":"Lys","GAT":"Asp","GAC":"Asp","GAA":"Glu","GAG":"Glu","TGT":"Cys","TGC":"Cys","TGA":"STOP","TGG":"Trp","CGT":"Arg","CGC":"Arg","CGA":"Arg","CGG":"Arg","AGT":"Ser","AGC":"Ser","AGA":"Arg","AGG":"Arg","GGT":"Gly","GGC":"Gly","GGA":"Gly","GGG":"Gly"}
 
 # Regular expression compile
 rEXPRESSION = re.compile('^[0-9A-Za-z!#$%&+./:;?@^_|~-][0-9A-Za-z!#$%&*+./:;=?@^_|~-]*$')
@@ -186,8 +187,13 @@ def fileAnalysis(file, option, samFile, fileNumber):
     mutatedBaseList = []
     mutationsList = []
     qScoreList = []
+    mutRelevanceC1List = []
+    mutRelevanceC2List = []
+    mutRelevanceC3List = []
     dicoSubstitutions = {}
     dicoCigar = {}
+
+    outputCsv = open("mutationFile"+str(samFile)+".csv","w")
 
     if option != "s":
         outputFile = open("outputFile"+str(samFile)+".txt", "w")
@@ -199,7 +205,7 @@ def fileAnalysis(file, option, samFile, fileNumber):
         i += 1
         ERROR_COUNT = 11    # 11 car il y a 11 champs obligatoires dans un fichier SAM
 
-        # A first sorting is made on whether or not the line is from the header section or not
+        # a first sorting is made on whether or not the line is from the header section or not
         if line[0].startswith(tHEADERS) == True:
             headerCount += 1
             for field in range(len(tHEADERS)):
@@ -294,7 +300,39 @@ def fileAnalysis(file, option, samFile, fileNumber):
                                         else:
                                             mutatedBaseList.append(int(line[3])+baseCounter+matchedBase)    # if the mutation is on the forward read, add the mutation position to the beginning of the read alignement
                                         mutationsList.append(str(line[9][baseCounter+matchedBase])+" -> "+str(mutations[substitution][-1]))  # store the mutation in the form 'N -> N'
-                                        qScoreList.append(str(line[10][baseCounter+matchedBase]))   #   store the QUAL value of substitued base
+                                        qScoreList.append(str(line[10][baseCounter+matchedBase]))   #   store the QUAL value of substituted base
+
+                                        if baseCounter+matchedBase-2 >= 0 and ((baseCounter+matchedBase) < len(line[9])):
+                                            codonRefCadre1 = (line[9][baseCounter+matchedBase-2],line[9][baseCounter+matchedBase-1],line[9][baseCounter+matchedBase])
+                                            codonQueryCadre1 = (line[9][baseCounter+matchedBase-2],line[9][baseCounter+matchedBase-1],mutations[substitution][-1])
+
+                                        if baseCounter+matchedBase-1 >= 0 and ((baseCounter+matchedBase+1) < len(line[9])):
+                                            codonRefCadre2 = (line[9][baseCounter+matchedBase-1],line[9][baseCounter+matchedBase],line[9][baseCounter+matchedBase+1])
+                                            codonQueryCadre2 = (line[9][baseCounter+matchedBase-1],mutations[substitution][-1],line[9][baseCounter+matchedBase+1])
+
+                                        if baseCounter+matchedBase >= 0 and ((baseCounter+matchedBase+2) < len(line[9])):
+                                            codonRefCadre3 = (line[9][baseCounter+matchedBase],line[9][baseCounter+matchedBase+1],line[9][baseCounter+matchedBase+2])
+                                            codonQueryCadre3 = (mutations[substitution][-1],line[9][baseCounter+matchedBase+1],line[9][baseCounter+matchedBase+2])
+                                         
+
+                                        for codons in dCODONS.keys():
+                                            if "".join(codonRefCadre1) == codons: codonR1 = dCODONS[codons]
+                                            if "".join(codonRefCadre2) == codons: codonR2 = dCODONS[codons]
+                                            if "".join(codonRefCadre3) == codons: codonR3 = dCODONS[codons]
+
+                                            if "".join(codonQueryCadre1) == codons: codonQ1 = dCODONS[codons]
+                                            if "".join(codonQueryCadre2) == codons: codonQ2 = dCODONS[codons]
+                                            if "".join(codonQueryCadre3) == codons: codonQ3 = dCODONS[codons]
+
+                                        if codonR1 == codonQ1: mutRelevanceC1List.append("synonymous")
+                                        else: mutRelevanceC1List.append("non synonymous ("+str(codonR1)+" to "+str(codonQ1)+")")
+                                        
+                                        if codonR2 == codonQ2: mutRelevanceC2List.append("synonymous")
+                                        else: mutRelevanceC2List.append("non synonymous ("+str(codonR2)+" to "+str(codonQ2)+")")
+                                        
+                                        if codonR3 == codonQ3: mutRelevanceC3List.append("synonymous")
+                                        else: mutRelevanceC3List.append("non synonymous ("+str(codonR3)+" to "+str(codonQ3)+")")
+
                                         baseCounter += matchedBase + 1
 
                     champsCigar = re.findall('[0-9]+\D', line[5])   # find all CIGAR information
@@ -325,12 +363,22 @@ def fileAnalysis(file, option, samFile, fileNumber):
 
     for value in dicoCigar: cigarTotalCount += dicoCigar[value]
 
+    # count of each possible substitution (A->T, A->C, A->G, etc)
     for mutation in mutationsList:
         if mutation in dicoSubstitutions.keys():
             dicoSubstitutions[mutation] += 1
         else:
             dicoSubstitutions[mutation] = 1
     tDicoSub = sorted(dicoSubstitutions.items(),key=lambda x:x[1], reverse=True)    # sort the dictionary in descending order
+
+    outputCsv.write(str(cARGUMENTS_LIST[samFile])+"\nNucleotide N°,Mutation,Base call accuracy (%),ORF1,ORF2,ORF3\n")
+    for x in range(len(mutationsList)): # writing of the list of all substitutions found in the query sequence relative to the reference sequence
+        for qScoreListValue in range(len(mQUAL_INTERPRET[0,])):
+            if qScoreList[x] == mQUAL_INTERPRET[0,qScoreListValue]:
+                quality = int(mQUAL_INTERPRET[1,qScoreListValue])
+                outputCsv.write(str(mutatedBaseList[x])+","+str(mutationsList[x])+","+str(round((1-(10**(-quality/10)))*100,2))+","+mutRelevanceC1List[x]+","+mutRelevanceC2List[x]+","+mutRelevanceC3List[x]+"\n")
+    outputCsv.close()
+    print(Fore.YELLOW+"\nCSV file for "+str(cARGUMENTS_LIST[samFile])+" created."+Fore.RESET)
 
     if option != "s":
         outputFile.write("\n**********************************\n\ntotal reads count : "+str(i-headerCount)
@@ -339,21 +387,15 @@ def fileAnalysis(file, option, samFile, fileNumber):
             +"\n\t\t-> partially mapped reads count : "+str(badlyMappedCount)
             +"\n\t-> unmapped reads count : "+str(unmappedCount)
             +"\n\n**********************************\n\nGlobal CIGAR mutations observed on aligned sequences:\n\n")
-        for key in dicoCigar.keys():
+        for key in dicoCigar.keys():    # writing of the different CIGAR mutations and their number
             for x in range(len(mCIGAR_MATRIX[0,])):
                 if key == mCIGAR_MATRIX[0,x]:
-                    outputFile.write(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/cigarTotalCount), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(cigarTotalCount)+" mutations)\n")
+                    outputFile.write(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/cigarTotalCount), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(cigarTotalCount)+" nucleotides)\n")
         outputFile.write("\n**********************************\n\nSummary of nucleotide substitutions :\n\nSubstitution\t\tIteration\n------------------------------------\n")
-        for x in range(len(tDicoSub)):
+        for x in range(len(tDicoSub)):  # writing of the different substitution possible and the number of time they are observed
             outputFile.write(str(tDicoSub[x][0])+"\t\t\t"+str(tDicoSub[x][1])+"\n")
-        outputFile.write("\n**********************************\n\nList of substitutions in totally mapped reads :\n\nNucleotide N°\t\tMutation\t\tBase call accuracy (%)\n----------------------------------------------------------------------\n")
-        for x in range(len(mutationsList)):
-            for qScoreListValue in range(len(mQUAL_INTERPRET[0,])):
-                if qScoreList[x] == mQUAL_INTERPRET[0,qScoreListValue]:
-                    quality = int(mQUAL_INTERPRET[1,qScoreListValue])
-                    outputFile.write(str(mutatedBaseList[x])+"\t\t\t"+str(mutationsList[x])+"\t\t\t"+str(round((1-(10**(-quality/10)))*100,2))+"\n")
-
-        print(Fore.YELLOW+"\nOutput file for "+str(cARGUMENTS_LIST[samFile])+" created."+Fore.RESET)
+  
+        print(Fore.YELLOW+"Output file for "+str(cARGUMENTS_LIST[samFile])+" created."+Fore.RESET)
         outputFile.close()
 
     if option != "o":
@@ -366,7 +408,7 @@ def fileAnalysis(file, option, samFile, fileNumber):
         for key in dicoCigar.keys():
             for x in range(len(mCIGAR_MATRIX[0,])):
                 if key == mCIGAR_MATRIX[0,x]:
-                    print(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/cigarTotalCount), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(cigarTotalCount)+" mutations)")
+                    print(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/cigarTotalCount), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(cigarTotalCount)+" nucleotides)")
         for mut in mutationsList:
             if mut in dicoSubstitutions.keys():
                 dicoSubstitutions[mut] += 1
