@@ -40,29 +40,35 @@ This README file is organized as follow :
 SamReader is a programm that analyses SAM files. It was developped with Python 3. It can analyse multiple files
 in one go. Results are either shown in the terminal or written in an output file. Features include:
 - Verifying the integrity of the files given as arguments.
-- Reads that are unmapped are not taken into account for the calculations.
-- Calculations for the percentages of mutations are based on the CIGAR field.
-- Mutations list is only available with the '-o' or '-t -o' options.
+- Mutation analysis includes:
+	-> quantification of each type of mutations possible from CIGAR analysis
+	For substitution mutations:
+	-> calculation of the number of each substitution possibilities (i.e. A->T, A->C, A->G, etc)
+	-> list of all the substitution found in the query sequence relative to the reference, with the quality of
+	base calling, and whether or not the mutation is synonymous for each possible reading frames
+- Output in the terminal (-s), in a file (-o) or both (-s -o). A CSV file containing the list described above is
+created independently of the option choosen.
 
 
 **** EXECUTION ****
 
+This extra step is sometime necessary on MacOS, does not concern Linux or Windows users:
 Add execution permission to the script:
 $ chmod +x ~/path/to/file/SamReader.py
 
 Run the following command in the terminal to execute SamReader (output file field is optionnal):
 $ ~/path/to/file/SamReader.py <input-file.sam> -options <output-file.txt>
 
-SamReader can analyse mutliple files at once (output files fields are optionnal):
+SamReader can analyse mutliple files at once (output files fields are optionnals):
 $ ~/path/to/file/SamReader.py <input-file1.sam> <input-file2.sam> -options <output-file1.txt> <outpute-file2.txt>
 
 
 **** OPTIONS ****
 
 Choosing from one of the following options is MANDATORY :
--t	show the results in the terminal, without saving them in a file
+-s	show the results in the terminal, without saving them in a file
 -o	save the results in a file which name is given by the user, or in the default file "summary_data_file.txt"
--t -o	show the results in the terminal AND save them in a file
+-s -o	show the results in the terminal AND save them in a file
 
 
 **** HELP ****
@@ -92,45 +98,38 @@ $ ~/path/to/file/SamReader.py -hp
 The output is presented as follow, it is the same for terminal or file output, except for "List of substitutions in totally mapped reads" that is only available in the file output :
 
 
-/home/alizee/mapping.sam						 |	file name and path
+Analyzing :
+mapping.sam	# file name, and path if given
 
-Informations :							       
-									 |
-@SQ - Reference_sequence_dictionary					 |
-Reference sequence name : Reference					 |
-Reference sequence length : 1000000					 | 	extraction of header sections 
-									 |	and of the corresponding informations
-@PG - Program								 |
-Program record identifier : bwa						 |
-Program name : bwa						         |
-									
-**********************************				       
-total reads count : 351331						 |
-	-> properly aligned reads count : 349998 (100% of total reads)	 |
-		-> totally mapped reads count : 349891			 |	reads informations
-		-> partially mapped reads count : 107			 |
-	-> unmapped reads count : 1315					 |
-								         |
-**********************************			      	
-Global cigar mutation observed on aligned sequences:		  |
-								  | 	
-								  |
-Percentages:							  |
-Alignment Match : 100.0%					  |
-Insertion : 0.0%						  |
-Deletion : 0.0%							  |	mutations informations
-Skipped region : 0.0%						  |	deducted from the CIGAR field
-Soft Clipping : 0.0%						  |
-Hard Clipping : 0.0%						  |
-Padding : 0.0%							  |
-Sequence Match : 0.0%						  |
-Sequence Mismatch : 0.0%				          |
+#extraction of header sections and of the corresponding informations
+Informations :
 
-**********************************
-List of substitutions in totally mapped reads :		|
-							|
-Nucleotide N°		Mutation			|
----------------------------------			|	mutations position information in reference
-402794			A -> G				|	sequence and nucleotidic modifications
-402837			A -> T				|
-402848			A -> G				|
+@SQ - Reference_sequence_dictionary
+Reference sequence name : Reference
+
+@PG - Program
+Program record identifier : bwa
+
+CSV file for mapping.sam created.
+Output file for mapping.sam created.	# if option -o is chosen
+
+#reads informations
+total reads count : 351330
+	-> aligned reads count : 350015 (99.63% of total reads)
+		-> totally mapped reads count : 349893
+		-> partially mapped reads count : 122
+	-> unmapped reads count : 1315
+
+# mutations informations as given by the CIGAR field
+Mutations analysis:
+Alignement Match : 99.9951%     (35000611 out of 35002311 nucleotides)
+Deletion : 0.0002%     (61 out of 35002311 nucleotides)
+Insertion : 0.0001%     (18 out of 35002311 nucleotides)
+Soft Clipping : 0.0046%     (1621 out of 35002311 nucleotides)
+
+# number of each substitution possibilities sorted in descending order
+Summary of nucleotide substitutions :
+Substitution		Iteration
+------------------------------------
+G -> A			5391
+T -> A			5363
