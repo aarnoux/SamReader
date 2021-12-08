@@ -302,38 +302,39 @@ def fileAnalysis(file, option, samFile, fileNumber):
                                         mutationsList.append(str(line[9][baseCounter+matchedBase])+" -> "+str(mutations[substitution][-1]))  # store the mutation in the form 'N -> N'
                                         qScoreList.append(str(line[10][baseCounter+matchedBase]))   #   store the QUAL value of substituted base
 
+                                        # around the mutated nucleotide (N): find the codons (X) from the reference sequence and the query sequence in a arbitrary defined open reading frame (ORF) as XXN
                                         if baseCounter+matchedBase-2 >= 0 and ((baseCounter+matchedBase) < len(line[9])):
                                             codonRefCadre1 = (line[9][baseCounter+matchedBase-2],line[9][baseCounter+matchedBase-1],line[9][baseCounter+matchedBase])
                                             codonQueryCadre1 = (line[9][baseCounter+matchedBase-2],line[9][baseCounter+matchedBase-1],mutations[substitution][-1])
 
+                                        # around the mutated nucleotide (N): find the codons (X) from the reference sequence and the query sequence in a arbitrary defined open reading frame (ORF) as XNX
                                         if baseCounter+matchedBase-1 >= 0 and ((baseCounter+matchedBase+1) < len(line[9])):
                                             codonRefCadre2 = (line[9][baseCounter+matchedBase-1],line[9][baseCounter+matchedBase],line[9][baseCounter+matchedBase+1])
                                             codonQueryCadre2 = (line[9][baseCounter+matchedBase-1],mutations[substitution][-1],line[9][baseCounter+matchedBase+1])
 
+                                        # around the mutated nucleotide (N): find the codons (X) from the reference sequence and the query sequence in a arbitrary defined open reading frame (ORF) as NXX
                                         if baseCounter+matchedBase >= 0 and ((baseCounter+matchedBase+2) < len(line[9])):
                                             codonRefCadre3 = (line[9][baseCounter+matchedBase],line[9][baseCounter+matchedBase+1],line[9][baseCounter+matchedBase+2])
                                             codonQueryCadre3 = (mutations[substitution][-1],line[9][baseCounter+matchedBase+1],line[9][baseCounter+matchedBase+2])
                                          
-
+                                        # associate the precedently found codons to the corresponding amino acid, for each ORF
                                         for codons in dCODONS.keys():
                                             if "".join(codonRefCadre1) == codons: codonR1 = dCODONS[codons]
                                             if "".join(codonRefCadre2) == codons: codonR2 = dCODONS[codons]
                                             if "".join(codonRefCadre3) == codons: codonR3 = dCODONS[codons]
-
                                             if "".join(codonQueryCadre1) == codons: codonQ1 = dCODONS[codons]
                                             if "".join(codonQueryCadre2) == codons: codonQ2 = dCODONS[codons]
                                             if "".join(codonQueryCadre3) == codons: codonQ3 = dCODONS[codons]
 
+                                        # test whether the amino acid from the query match the one from the reference, if so return "synonymous", if not, indicates which amino acid is substituted with which
                                         if codonR1 == codonQ1: mutRelevanceC1List.append("synonymous")
                                         else: mutRelevanceC1List.append("non synonymous ("+str(codonR1)+" to "+str(codonQ1)+")")
-                                        
                                         if codonR2 == codonQ2: mutRelevanceC2List.append("synonymous")
-                                        else: mutRelevanceC2List.append("non synonymous ("+str(codonR2)+" to "+str(codonQ2)+")")
-                                        
+                                        else: mutRelevanceC2List.append("non synonymous ("+str(codonR2)+" to "+str(codonQ2)+")")                                        
                                         if codonR3 == codonQ3: mutRelevanceC3List.append("synonymous")
                                         else: mutRelevanceC3List.append("non synonymous ("+str(codonR3)+" to "+str(codonQ3)+")")
 
-                                        baseCounter += matchedBase + 1
+                                        baseCounter += matchedBase + 1  # set the counter to the place of the mutation, in case of a double mutation in the read
 
                     champsCigar = re.findall('[0-9]+\D', line[5])   # find all CIGAR information
                     for champ in range(len(champsCigar)):
@@ -372,7 +373,9 @@ def fileAnalysis(file, option, samFile, fileNumber):
     tDicoSub = sorted(dicoSubstitutions.items(),key=lambda x:x[1], reverse=True)    # sort the dictionary in descending order
 
     outputCsv.write(str(cARGUMENTS_LIST[samFile])+"\nNucleotide N°,Mutation,Base call accuracy (%),ORF1,ORF2,ORF3\n")
-    for x in range(len(mutationsList)): # writing of the list of all substitutions found in the query sequence relative to the reference sequence
+
+    # writing of the list of all substitutions found in the query sequence relative to the reference sequence, with the quality of the base call and the nature of the mutation (synonymous or not) in the 3 ORF possible
+    for x in range(len(mutationsList)):
         for qScoreListValue in range(len(mQUAL_INTERPRET[0,])):
             if qScoreList[x] == mQUAL_INTERPRET[0,qScoreListValue]:
                 quality = int(mQUAL_INTERPRET[1,qScoreListValue])
@@ -387,12 +390,16 @@ def fileAnalysis(file, option, samFile, fileNumber):
             +"\n\t\t-> partially mapped reads count : "+str(badlyMappedCount)
             +"\n\t-> unmapped reads count : "+str(unmappedCount)
             +"\n\n**********************************\n\nGlobal CIGAR mutations observed on aligned sequences:\n\n")
-        for key in dicoCigar.keys():    # writing of the different CIGAR mutations and their number
+
+        # writing of the different CIGAR mutations and their number
+        for key in dicoCigar.keys():
             for x in range(len(mCIGAR_MATRIX[0,])):
                 if key == mCIGAR_MATRIX[0,x]:
                     outputFile.write(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/cigarTotalCount), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(cigarTotalCount)+" nucleotides)\n")
+        
+        # writing of the different substitution possible and the number of time they are observed
         outputFile.write("\n**********************************\n\nSummary of nucleotide substitutions :\n\nSubstitution\t\tIteration\n------------------------------------\n")
-        for x in range(len(tDicoSub)):  # writing of the different substitution possible and the number of time they are observed
+        for x in range(len(tDicoSub)):
             outputFile.write(str(tDicoSub[x][0])+"\t\t\t"+str(tDicoSub[x][1])+"\n")
   
         print(Fore.YELLOW+"Output file for "+str(cARGUMENTS_LIST[samFile])+" created."+Fore.RESET)
@@ -405,18 +412,17 @@ def fileAnalysis(file, option, samFile, fileNumber):
             +"\n\t\t-> partially mapped reads count : "+str(badlyMappedCount)
             +"\n\t-> unmapped reads count : "+str(unmappedCount)
             +"\n\nMutations analysis:")
+        
+        # writing of the different CIGAR mutations and their number
         for key in dicoCigar.keys():
             for x in range(len(mCIGAR_MATRIX[0,])):
                 if key == mCIGAR_MATRIX[0,x]:
                     print(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/cigarTotalCount), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(cigarTotalCount)+" nucleotides)")
-        for mut in mutationsList:
-            if mut in dicoSubstitutions.keys():
-                dicoSubstitutions[mut] += 1
-            else:
-                dicoSubstitutions[mut] = 1
+        
+        # writing of the different substitution possible and the number of time they are observed
         print("\nSummary of nucleotide substitutions :\nSubstitution\t\tIteration\n------------------------------------")
-        for x in dicoSubstitutions:
-            print(str(x)+"\t\t\t"+str(dicoSubstitutions[x]))
+        for x in range(len(tDicoSub)):
+            print(str(tDicoSub[x][0])+"\t\t\t"+str(tDicoSub[x][1]))
 
     # rename the output files if the user gave specific names
     if option == "o" and len(cARGUMENTS_LIST) > (fileNumber + samFile) and len(cARGUMENTS_LIST[fileNumber + samFile]) > 2:
