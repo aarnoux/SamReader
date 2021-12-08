@@ -184,6 +184,7 @@ def fileAnalysis(file, option, samFile, fileNumber):
     cigarTotalCount = 0
     researchQuery = False
     errorSearch = "NULL"
+    qnameList = []
     mutatedBaseList = []
     mutationsList = []
     qScoreList = []
@@ -294,6 +295,7 @@ def fileAnalysis(file, option, samFile, fileNumber):
                                 if line[field][:5] == "MD:Z:" and re.match('(?![0-9]+$)', line[field][5:]): # check that the "MD" field is present and the sequence match is not 100%
                                     mutations = re.findall('[0-9]+\D', line[field])
                                     for substitution in range(len(mutations)):
+                                        qnameList.append(str(line[0]))
                                         matchedBase = int(mutations[substitution][:-1])    # if so, extract all mutations
                                         if int(line[8]) < 0:    # test whether the mutation is present on the complementary read
                                             mutatedBaseList.append(int(line[3])-baseCounter-matchedBase)    # if the mutation is on the complementary read, substract the mutation position from the beginning of the read alignement
@@ -372,14 +374,14 @@ def fileAnalysis(file, option, samFile, fileNumber):
             dicoSubstitutions[mutation] = 1
     tDicoSub = sorted(dicoSubstitutions.items(),key=lambda x:x[1], reverse=True)    # sort the dictionary in descending order
 
-    outputCsv.write(str(cARGUMENTS_LIST[samFile])+"\nNucleotide N°,Mutation,Base call accuracy (%),ORF1,ORF2,ORF3\n")
+    outputCsv.write(str(cARGUMENTS_LIST[samFile])+"\nn°read,Nucleotide N°,Mutation,Base call accuracy (%),ORF1,ORF2,ORF3\n")
 
     # writing of the list of all substitutions found in the query sequence relative to the reference sequence, with the quality of the base call and the nature of the mutation (synonymous or not) in the 3 ORF possible
     for x in range(len(mutationsList)):
         for qScoreListValue in range(len(mQUAL_INTERPRET[0,])):
             if qScoreList[x] == mQUAL_INTERPRET[0,qScoreListValue]:
                 quality = int(mQUAL_INTERPRET[1,qScoreListValue])
-                outputCsv.write(str(mutatedBaseList[x])+","+str(mutationsList[x])+","+str(round((1-(10**(-quality/10)))*100,2))+","+mutRelevanceC1List[x]+","+mutRelevanceC2List[x]+","+mutRelevanceC3List[x]+"\n")
+                outputCsv.write(str(qnameList[x])+","+str(mutatedBaseList[x])+","+str(mutationsList[x])+","+str(round((1-(10**(-quality/10)))*100,2))+","+mutRelevanceC1List[x]+","+mutRelevanceC2List[x]+","+mutRelevanceC3List[x]+"\n")
     outputCsv.close()
     print(Fore.YELLOW+"\nCSV file for "+str(cARGUMENTS_LIST[samFile])+" created."+Fore.RESET)
 
