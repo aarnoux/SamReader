@@ -67,7 +67,7 @@ $ ~/path/to/file/SamReader.py <input-file1.sam> <input-file2.sam> -options <outp
 
 Choosing from one of the following options is MANDATORY :
 -s	show the results in the terminal, without saving them in a file
--o	save the results in a file which name is given by the user, or in the default file "summary_data_file.txt"
+-o	save the results in a file which name is given by the user, or in the default file "outputFile.txt"
 -s -o	show the results in the terminal AND save them in a file
 
 
@@ -95,7 +95,9 @@ $ ~/path/to/file/SamReader.py -hp
 
 **** OUTPUT ****
 
-The output is presented as follow, it is the same for terminal or file output, except for "List of substitutions in totally mapped reads" that is only available in the file output :
+A CSV file that contains the list of all the substitution found in the query sequence relative to the reference, with the quality of
+base calling, read ID, and whether or not the mutation is synonymous for each possible reading frames.
+The output in the terminal or in file is presented as follow:
 
 
 Analyzing :
