@@ -155,8 +155,8 @@ def userOptionChoice(fileNumber):
     return option
 
 # Function that reads the SAM file as a csv file, with tabulations delimiters, and returns it to be analyzed 
-def fileHandler(samFileNumber):
-    fi = open(cARGUMENTS_LIST[samFileNumber])
+def fileHandler(samFile):
+    fi = open(cARGUMENTS_LIST[samFile])
     file = csv.reader(fi, delimiter = '\t', quoting = csv.QUOTE_NONE)
     fi.close
     return file
@@ -173,26 +173,27 @@ def flagBinary(flag) :
     return flagB
 
 # Function that analyzes the file
-def fileAnalysis(file, option, samFileNumber, fileNumber):
+def fileAnalysis(file, option, samFile, fileNumber):
     # Variables that need to be reinitialized for each file
     i = 0
     headerCount = 0
     unmappedCount = 0
-    partiallyMappedCount = 0
+    badlyMappedCount = 0
     totallyMappedCount = 0
+    cigarTotalCount = 0
     researchQuery = False
     errorSearch = "NULL"
-    nucleotideNb = []
-    mutation = []
-    qScore = []
+    mutatedBaseList = []
+    mutationsList = []
+    qScoreList = []
     dicoSubstitutions = {}
     dicoCigar = {}
 
     if option != "s":
-        outputFile = open("outputFile"+str(samFileNumber)+".txt", "w")
-        outputFile.write(str(sys.argv[samFileNumber])+'\n\nInformations :\n')
+        outputFile = open("outputFile"+str(samFile)+".txt", "w")
+        outputFile.write(str(sys.argv[samFile])+'\n\nInformations :\n')
     if option != "o":
-        print("\nAnalyzing :\n"+Back.WHITE+Fore.BLACK+str(sys.argv[samFileNumber])+Fore.RESET+Back.RESET)
+        print("\nAnalyzing :\n"+Back.WHITE+Fore.BLACK+str(sys.argv[samFile])+Fore.RESET+Back.RESET)
 
     for line in file:
         i += 1
@@ -270,38 +271,38 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                 flag = flagBinary(line[1])  # the flag is translated into binary
 
                 # if '0100' is present in the flag field, it means that a '4' is in the flag (= unmapped read)
-                if int(flag[-3]) == 1:
-                    unmappedCount += 1
+                if int(flag[-3]) == 1: unmappedCount += 1
 
                 # if '0010' is present in the flag field, it means that a '2' is in the flag (= properly aligned read), a flag of 0 doesn't mean that the flag is unmapped so it has to be taken into account
                 else:
 
-                    # in the CIGAR field, extract the partially mapped reads
-                    if re.match('(?![0-9]+M$)', line[5]): partiallyMappedCount += 1 
+                    # in the CIGAR field, extract the badly mapped reads
+                    if re.match('(?![0-9]+M$)', line[5]): badlyMappedCount += 1 
                     else:
                         totallyMappedCount +=1
-                        if len(line)-cMIN_LINE_LENGHT > 0:   # from the totally mapped reads, search for the optional "MD" field
-                            for c in range(cMIN_LINE_LENGHT,len(line)):
-                                pointerSeq = 0
-                                if line[c][:5] == "MD:Z:" and re.match('(?![0-9]+$)', line[c][5:]): # check that the "MD" field is present and the sequence match is not 100%
-                                    mutations = re.findall('[0-9]+\D', line[c])
-                                    for m in range(len(mutations)):
-                                        matchNb = int(mutations[m][:-1])    # if so, extract all mutations
-                                        if int(line[8]) < 0:
-                                            nucleotideNb.append(int(line[3])-pointerSeq-matchNb)    # if the mutation is on the complementary read, substract the mutation position from the beginning of the read alignement
+                        
+                        # from the totally mapped reads, search for the optional "MD" field
+                        if len(line)-cMIN_LINE_LENGHT > 0:
+                            for field in range(cMIN_LINE_LENGHT,len(line)):
+                                baseCounter = 0
+                                if line[field][:5] == "MD:Z:" and re.match('(?![0-9]+$)', line[field][5:]): # check that the "MD" field is present and the sequence match is not 100%
+                                    mutations = re.findall('[0-9]+\D', line[field])
+                                    for substitution in range(len(mutations)):
+                                        matchedBase = int(mutations[substitution][:-1])    # if so, extract all mutations
+                                        if int(line[8]) < 0:    # test whether the mutation is present on the complementary read
+                                            mutatedBaseList.append(int(line[3])-baseCounter-matchedBase)    # if the mutation is on the complementary read, substract the mutation position from the beginning of the read alignement
                                         else:
-                                            nucleotideNb.append(int(line[3])+pointerSeq+matchNb)    # if the mutation is on the forward read, add the mutation position to the beginning of the read alignement
-                                        mutation.append(str(line[9][pointerSeq+matchNb])+" -> "+str(mutations[m][-1]))  # find the nucleotide that was substitued
-                                        qScore.append(str(line[10][pointerSeq+matchNb]))
-                                        pointerSeq += matchNb + 1
+                                            mutatedBaseList.append(int(line[3])+baseCounter+matchedBase)    # if the mutation is on the forward read, add the mutation position to the beginning of the read alignement
+                                        mutationsList.append(str(line[9][baseCounter+matchedBase])+" -> "+str(mutations[substitution][-1]))  # store the mutation in the form 'N -> N'
+                                        qScoreList.append(str(line[10][baseCounter+matchedBase]))   #   store the QUAL value of substitued base
+                                        baseCounter += matchedBase + 1
 
                     champsCigar = re.findall('[0-9]+\D', line[5])   # find all CIGAR information
                     for champ in range(len(champsCigar)):
-                        temp = champsCigar[champ]
-                        if temp[-1] in dicoCigar.keys():
-                            dicoCigar[temp[-1]] += int(temp[:(len(temp)-1)])
+                        if champsCigar[champ][-1] in dicoCigar.keys():    # check if there is already an entry for the mutation in the dictionary
+                            dicoCigar[champsCigar[champ][-1]] += int(champsCigar[champ][:-1])
                         else:
-                            dicoCigar[temp[-1]] = int(temp[:(len(temp)-1)])
+                            dicoCigar[champsCigar[champ][-1]] = int(champsCigar[champ][:-1])
             
             # if there are errors on the line, pass 1 time in the following condition
             elif researchQuery == False:
@@ -310,76 +311,76 @@ def fileAnalysis(file, option, samFileNumber, fileNumber):
                 if errorSearch == "n":
                     exit()
                 elif errorSearch != "y":
-                    print(Fore.RED+"Input error : arrêt du script"+Fore.RESET)
+                    print(Fore.RED+"Input error : exit."+Fore.RESET)
                     exit()
 
     # if the user wanted to search the entire file, after the error search is complete exit the script
     if errorSearch == "y":
-        print(Fore.YELLOW+"Fin de la recherche d'erreur."+Fore.RESET)
+        print(Fore.YELLOW+"End of error research."+Fore.RESET)
         exit()
 
+    if totallyMappedCount + badlyMappedCount == 0:
+        print(Fore.RED+"No reads could be analyzed"+Fore.RESET)
+        exit()
+
+    for value in dicoCigar: cigarTotalCount += dicoCigar[value]
+
+    for mutation in mutationsList:
+        if mutation in dicoSubstitutions.keys():
+            dicoSubstitutions[mutation] += 1
+        else:
+            dicoSubstitutions[mutation] = 1
+    tDicoSub = sorted(dicoSubstitutions.items(),key=lambda x:x[1], reverse=True)    # sort the dictionary in descending order
+
     if option != "s":
-        outputFile.write("\n**********************************\ntotal reads count : "+str(i-headerCount))
-        outputFile.write("\n\t-> aligned reads count : "+str(totallyMappedCount+partiallyMappedCount)+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/(i-headerCount),2))+"% of total reads)")
-        outputFile.write("\n\t\t-> totally mapped reads count : "+str(totallyMappedCount))
-        outputFile.write("\n\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
-        outputFile.write("\n\t-> unmapped reads count : "+str(unmappedCount)+"\n")
+        outputFile.write("\n**********************************\n\ntotal reads count : "+str(i-headerCount)
+            +"\n\t-> aligned reads count : "+str(totallyMappedCount+badlyMappedCount)+" ("+str(round((totallyMappedCount+badlyMappedCount)*100/(i-headerCount),2))+"% of total reads)"
+            +"\n\t\t-> totally mapped reads count : "+str(totallyMappedCount)
+            +"\n\t\t-> partially mapped reads count : "+str(badlyMappedCount)
+            +"\n\t-> unmapped reads count : "+str(unmappedCount)
+            +"\n\n**********************************\n\nGlobal CIGAR mutations observed on aligned sequences:\n\n")
+        for key in dicoCigar.keys():
+            for x in range(len(mCIGAR_MATRIX[0,])):
+                if key == mCIGAR_MATRIX[0,x]:
+                    outputFile.write(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/cigarTotalCount), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(cigarTotalCount)+" mutations)\n")
+        outputFile.write("\n**********************************\n\nSummary of nucleotide substitutions :\n\nSubstitution\t\tIteration\n------------------------------------\n")
+        for x in range(len(tDicoSub)):
+            outputFile.write(str(tDicoSub[x][0])+"\t\t\t"+str(tDicoSub[x][1])+"\n")
+        outputFile.write("\n**********************************\n\nList of substitutions in totally mapped reads :\n\nNucleotide N°\t\tMutation\t\tBase call accuracy (%)\n----------------------------------------------------------------------\n")
+        for x in range(len(mutationsList)):
+            for qScoreListValue in range(len(mQUAL_INTERPRET[0,])):
+                if qScoreList[x] == mQUAL_INTERPRET[0,qScoreListValue]:
+                    quality = int(mQUAL_INTERPRET[1,qScoreListValue])
+                    outputFile.write(str(mutatedBaseList[x])+"\t\t\t"+str(mutationsList[x])+"\t\t\t"+str(round((1-(10**(-quality/10)))*100,2))+"\n")
+
+        print(Fore.YELLOW+"\nOutput file for "+str(cARGUMENTS_LIST[samFile])+" created."+Fore.RESET)
+        outputFile.close()
 
     if option != "o":
-            print("\ntotal reads count : "+str(i-headerCount))
-            print("\t-> aligned reads count : "+Fore.GREEN+str(totallyMappedCount+partiallyMappedCount)+Fore.RESET+" ("+str(round((totallyMappedCount+partiallyMappedCount)*100/(i-headerCount),2))+"% of total reads)")
-            print("\t\t-> totally mapped reads count : "+str(totallyMappedCount))
-            print("\t\t-> partially mapped reads count : "+str(partiallyMappedCount))
-            print("\t-> unmapped reads count : "+str(unmappedCount))
-
-    # convert numerical values of the CIGAR field to percentages
-    if totallyMappedCount + partiallyMappedCount > 0:
-        totalValue = 0
-        for value in dicoCigar: totalValue += dicoCigar[value]
-
-        if option != "s":
-            outputFile.write("\n**********************************\nGlobal CIGAR mutations observed on aligned sequences:\n\n")
-            for key in dicoCigar.keys():
-                for x in range(len(mCIGAR_MATRIX[0,])):
-                    if key == mCIGAR_MATRIX[0,x]:
-                        outputFile.write(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/totalValue), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(totalValue)+" mutations)")
-
-            outputFile.write("\n**********************************\nList of dicoSubstitutions in totally mapped reads :\n\nNucleotide N°\t\tMutation\t\tBase call accuracy (%)\n----------------------------------------------------------------------\n")
-            for x in range(len(mutation)):
-                for qScoreValue in range(len(mQUAL_INTERPRET[0,])):
-                    if qScore[x] == mQUAL_INTERPRET[0,qScoreValue]:
-                        quality = int(mQUAL_INTERPRET[1,qScoreValue])
-                        outputFile.write(str(nucleotideNb[x])+"\t\t\t"+str(mutation[x])+"\t\t\t"+str(round((1-(10**(-quality/10)))*100,2))+"\n")
-
-            print(Fore.YELLOW+"\nSummary file for "+str(cARGUMENTS_LIST[samFileNumber])+" created."+Fore.RESET)
-
-            outputFile.close()
-        
-        if option != "o":
-            print("\nMutations analysis:")
-            for key in dicoCigar.keys():
-                for x in range(len(mCIGAR_MATRIX[0,])):
-                    if key == mCIGAR_MATRIX[0,x]:
-                        print(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/totalValue), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(totalValue)+" mutations)")
-            for mut in mutation:
-                if mut in dicoSubstitutions.keys():
-                    dicoSubstitutions[mut] += 1
-                else:
-                    dicoSubstitutions[mut] = 1
-            print("\nSummary of nucleotide substitutions :\nSubstitution\t\tIteration\n------------------------------------")
-            for x in dicoSubstitutions:
-                print(str(x)+"\t\t\t"+str(dicoSubstitutions[x]))
-
-    else:
-        if option != "s":
-            outputFile.write("No reads could be analyzed.")
-        if option != "o": print(Fore.RED+"No reads could be analyzed"+Fore.RESET)
+        print("\ntotal reads count : "+str(i-headerCount)
+            +"\n\t-> aligned reads count : "+str(totallyMappedCount+badlyMappedCount)+" ("+str(round((totallyMappedCount+badlyMappedCount)*100/(i-headerCount),2))+"% of total reads)"
+            +"\n\t\t-> totally mapped reads count : "+str(totallyMappedCount)
+            +"\n\t\t-> partially mapped reads count : "+str(badlyMappedCount)
+            +"\n\t-> unmapped reads count : "+str(unmappedCount)
+            +"\n\nMutations analysis:")
+        for key in dicoCigar.keys():
+            for x in range(len(mCIGAR_MATRIX[0,])):
+                if key == mCIGAR_MATRIX[0,x]:
+                    print(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/cigarTotalCount), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(cigarTotalCount)+" mutations)")
+        for mut in mutationsList:
+            if mut in dicoSubstitutions.keys():
+                dicoSubstitutions[mut] += 1
+            else:
+                dicoSubstitutions[mut] = 1
+        print("\nSummary of nucleotide substitutions :\nSubstitution\t\tIteration\n------------------------------------")
+        for x in dicoSubstitutions:
+            print(str(x)+"\t\t\t"+str(dicoSubstitutions[x]))
 
     # rename the output files if the user gave specific names
-    if option == "o" and len(cARGUMENTS_LIST) > (fileNumber + samFileNumber) and len(cARGUMENTS_LIST[fileNumber + samFileNumber]) > 2:
-        os.rename("summary_data_file"+str(samFileNumber)+".txt", cARGUMENTS_LIST[samFileNumber + fileNumber]+".txt")
-    elif option == "s+o" and len(cARGUMENTS_LIST) > (fileNumber + samFileNumber + 1) and len(cARGUMENTS_LIST[fileNumber + samFileNumber + 1]) > 2:
-        os.rename("summary_data_file"+str(samFileNumber)+".txt", cARGUMENTS_LIST[samFileNumber + fileNumber + 1]+".txt")
+    if option == "o" and len(cARGUMENTS_LIST) > (fileNumber + samFile) and len(cARGUMENTS_LIST[fileNumber + samFile]) > 2:
+        os.rename("outputFile"+str(samFile)+".txt", cARGUMENTS_LIST[samFile + fileNumber]+".txt")
+    elif option == "s+o" and len(cARGUMENTS_LIST) > (fileNumber + samFile + 1) and len(cARGUMENTS_LIST[fileNumber + samFile + 1]) > 2:
+        os.rename("outputFile"+str(samFile)+".txt", cARGUMENTS_LIST[samFile + fileNumber + 1]+".txt")
 
 # main function
 def main(cARGUMENTS_LIST):
@@ -387,9 +388,9 @@ def main(cARGUMENTS_LIST):
     help()
     fileNumber = checkInput(cARGUMENTS_LIST)
     option = userOptionChoice(fileNumber)
-    for samFileNumber in range(1,fileNumber):
-        file = fileHandler(samFileNumber)
-        fileAnalysis(file, option, samFileNumber, fileNumber)
+    for samFile in range(1,fileNumber):
+        file = fileHandler(samFile)
+        fileAnalysis(file, option, samFile, fileNumber)
 
 if __name__ == "__main__":
     main(sys.argv)
