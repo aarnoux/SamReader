@@ -45,10 +45,11 @@ in one go. Results are either shown in the terminal or written in an output file
 	For substitution mutations:
 	-> calculation of the number of each substitution possibilities (i.e. A->T, A->C, A->G, etc)
 	-> list of all the substitution found in the query sequence relative to the reference, with the quality of
-	base calling, and whether or not the mutation is synonymous for each possible reading frames
+	base calling, and whether or not the mutation is synonymous for each possible open reading frames (ORF)
 - Output in the terminal (-s), in a file (-o) or both (-s -o). A CSV file containing the list described above is
 created independently of the option choosen.
 
+ATTENTION: The three ORF are arbitrarily defined for each mutations, as such you CAN NOT compare the results between different lines from the .csv file.
 
 **** EXECUTION ****
 
