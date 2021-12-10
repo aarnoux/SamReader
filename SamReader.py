@@ -8,7 +8,7 @@ __date__ = "12/14/2021"
 __licence__ ="This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>."
 
 import os, sys, csv, re, colorama, numpy
-from colorama import Fore, Back, Style
+from colorama import Fore, Back
 
 # Matrix
 mHEADER_LINE = numpy.array([['VN','SO','GO','SS'],['Format version','Sorting order of alignments','Grouping of alignments','Sub-sorting order of alignments']])
@@ -163,6 +163,59 @@ def fileHandler(samFile):
     fi.close
     return file
 
+def integrityCheck(line,re,Fore,rEXPRESSION,i):
+    ERROR_COUNT = 11    # 11 car il y a 11 champs obligatoires dans un fichier SAM
+    
+    # Error searching begins by researching the regular expression (RE) from the fields, and then:
+    # - if the RE is correct, the counter 'ERROR_COUNT' is decreased by 1
+    # - if the RE is incorrect, an error message is printed but the line continues to be analyzed
+    if (re.search('^[!-?A-~]{1,254}$', line[0])):
+        ERROR_COUNT -= 1
+    else:
+        print(Fore.RED+"QNAME field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ QNAME a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[0])+"\n"+str(line))
+    if (re.search('^[0-9]{1,4}$', line[1])):
+        ERROR_COUNT -= 1
+    else:
+        print(Fore.RED+"FLAG field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ FLAG a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[1])+"\n"+str(line))
+    if (rEXPRESSION.search(line[2]) or re.search('\*', line[2])):
+        ERROR_COUNT -= 1
+    else:
+        print(Fore.RED+"RNAME field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ RNAME a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[2])+"\n"+str(line))
+    if (re.search('^[0-9]*$', line[3])):
+        ERROR_COUNT -= 1
+    else:
+        print(Fore.RED+"POS field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ POS a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[3])+"\n"+str(line))
+    if (re.search('^[0-5][0-9]$''|^[0-9]$''|^(60)$''|^(255)$', line[4])):
+        ERROR_COUNT -= 1
+    else:
+        print(Fore.RED+"MAPQ field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ MAPQ a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[4])+"\n"+str(line))
+    if (re.search('^\*$''|^([0-9]+[MIDNSHPX=])+$', line[5])):
+        ERROR_COUNT -= 1
+    else:
+        print(Fore.RED+"CIGAR field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ CIGAR a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[5])+"\n"+str(line))                             
+    if (rEXPRESSION.search(line[6]) or re.search('^\*$', line[6]) or re.search('^=$', line[6])):
+        ERROR_COUNT -= 1
+    else:
+        print(Fore.RED+"RNEXT field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ RNEXT a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[6])+"\n"+str(line))
+    if (re.search('^[0-9]*$', line[7])):
+        ERROR_COUNT -= 1
+    else:
+        print(Fore.RED+"PNEXT field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ PNEXT a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[7])+"\n"+str(line))
+    if (re.search('^^-?[0-9]{1,30}$''|^-?20{31}$', line[8])):
+        ERROR_COUNT -= 1
+    else:
+        print(Fore.RED+"TLEN field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ TLEN a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[8])+"\n"+str(line))
+    if (re.search('^\*|[A-Za-z=.]+$', line[9])):
+        ERROR_COUNT -= 1
+    else:
+        print(Fore.RED+"SEQ field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ SEQ a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[9])+"\n"+str(line))
+    if (re.search('^[!-~]+$', line[10])):
+        ERROR_COUNT -= 1
+    else:
+        print(Fore.RED+"QUAL field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ QUAL a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[10])+"\n"+str(line))
+
+    return ERROR_COUNT
+
 # Function that returns the FLAG once converted in binary
 def flagBinary(flag) :
     flagB = bin(int(flag)) # Transform the integer into a binary.
@@ -173,6 +226,42 @@ def flagBinary(flag) :
         for t in range(add):
             flagB.insert(0,'0') # We insert 0 to complete until the maximal flag size.
     return flagB
+
+def mutationTranslation(baseCounter,matchedBase,line,dCODONS,mutations,substitution,mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List):
+    # around the mutated nucleotide (N): find the codon from the reference sequence and the query sequence in the arbitrary defined open reading frame 1 (ORF1) as XXN
+    if baseCounter+matchedBase-2 >= 0 and ((baseCounter+matchedBase) < len(line[9])):
+        codonRefCadre1 = (line[9][baseCounter+matchedBase-2],line[9][baseCounter+matchedBase-1],line[9][baseCounter+matchedBase])
+        codonQueryCadre1 = (line[9][baseCounter+matchedBase-2],line[9][baseCounter+matchedBase-1],mutations[substitution][-1])
+        for codons in dCODONS.keys():
+            if "".join(codonRefCadre1) == codons: codonR1 = dCODONS[codons]
+            if "".join(codonQueryCadre1) == codons: codonQ1 = dCODONS[codons]
+        if codonR1 == codonQ1: mutRelevanceC1List.append("synonymous")
+        else: mutRelevanceC1List.append("non synonymous ("+str(codonR1)+" to "+str(codonQ1)+")")
+    else: mutRelevanceC1List.append("NA")
+    # around the mutated nucleotide (N): find the codon from the reference sequence and the query sequence in the arbitrary defined open reading frame 2 (ORF2) as XNX
+    if baseCounter+matchedBase-1 >= 0 and ((baseCounter+matchedBase+1) < len(line[9])):
+        codonRefCadre2 = (line[9][baseCounter+matchedBase-1],line[9][baseCounter+matchedBase],line[9][baseCounter+matchedBase+1])
+        codonQueryCadre2 = (line[9][baseCounter+matchedBase-1],mutations[substitution][-1],line[9][baseCounter+matchedBase+1])
+        for codons in dCODONS.keys():
+            if "".join(codonRefCadre2) == codons: codonR2 = dCODONS[codons]
+            if "".join(codonQueryCadre2) == codons: codonQ2 = dCODONS[codons]
+        if codonR2 == codonQ2: mutRelevanceC2List.append("synonymous")
+        else: mutRelevanceC2List.append("non synonymous ("+str(codonR2)+" to "+str(codonQ2)+")")
+    else: mutRelevanceC2List.append("NA")
+    # around the mutated nucleotide (N): find the codon from the reference sequence and the query sequence in the arbitrary defined open reading frame 3 (ORF3) as NXX
+    if baseCounter+matchedBase >= 0 and ((baseCounter+matchedBase+2) < len(line[9])):
+        codonRefCadre3 = (line[9][baseCounter+matchedBase],line[9][baseCounter+matchedBase+1],line[9][baseCounter+matchedBase+2])
+        codonQueryCadre3 = (mutations[substitution][-1],line[9][baseCounter+matchedBase+1],line[9][baseCounter+matchedBase+2])
+        # associate the precedently found codons to the corresponding amino acid, for each ORF
+        for codons in dCODONS.keys():
+            if "".join(codonRefCadre3) == codons: codonR3 = dCODONS[codons]
+            if "".join(codonQueryCadre3) == codons: codonQ3 = dCODONS[codons]
+        # test whether the amino acid from the query match the one from the reference, if so return "synonymous", if not, indicates which amino acid is substituted with which
+        if codonR3 == codonQ3: mutRelevanceC3List.append("synonymous")
+        else: mutRelevanceC3List.append("non synonymous ("+str(codonR3)+" to "+str(codonQ3)+")")
+    else: mutRelevanceC3List.append("NA")
+   
+    return (mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List)
 
 # Function that analyzes the file
 def fileAnalysis(file, option, samFile, fileNumber):
@@ -228,53 +317,7 @@ def fileAnalysis(file, option, samFile, fileNumber):
                                 if option != "s":
                                     outputFile.write(str(dHEADER_FIELD_CALL[field][1,m])+" : "+str(line[headerSubField][3:]+"\n"))
         else:
-            # Error searching begins by researching the regular expression (RE) from the fields, and then:
-            # - if the RE is correct, the counter 'ERROR_COUNT' is decreased by 1
-            # - if the RE is incorrect, an error message is printed but the line continues to be analyzed
-            if (re.search('^[!-?A-~]{1,254}$', line[0])):
-                ERROR_COUNT -= 1
-            else:
-                print(Fore.RED+"QNAME field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ QNAME a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[0])+"\n"+str(line))
-            if (re.search('^[0-9]{1,4}$', line[1])):
-                ERROR_COUNT -= 1
-            else:
-                print(Fore.RED+"FLAG field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ FLAG a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[1])+"\n"+str(line))
-            if (rEXPRESSION.search(line[2]) or re.search('\*', line[2])):
-                ERROR_COUNT -= 1
-            else:
-                print(Fore.RED+"RNAME field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ RNAME a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[2])+"\n"+str(line))
-            if (re.search('^[0-9]*$', line[3])):
-                ERROR_COUNT -= 1
-            else:
-                print(Fore.RED+"POS field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ POS a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[3])+"\n"+str(line))
-            if (re.search('^[0-5][0-9]$''|^[0-9]$''|^(60)$''|^(255)$', line[4])):
-                ERROR_COUNT -= 1
-            else:
-                print(Fore.RED+"MAPQ field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ MAPQ a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[4])+"\n"+str(line))
-            if (re.search('^\*$''|^([0-9]+[MIDNSHPX=])+$', line[5])):
-                ERROR_COUNT -= 1
-            else:
-                print(Fore.RED+"CIGAR field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ CIGAR a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[5])+"\n"+str(line))                             
-            if (rEXPRESSION.search(line[6]) or re.search('^\*$', line[6]) or re.search('^=$', line[6])):
-                ERROR_COUNT -= 1
-            else:
-                print(Fore.RED+"RNEXT field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ RNEXT a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[6])+"\n"+str(line))
-            if (re.search('^[0-9]*$', line[7])):
-                ERROR_COUNT -= 1
-            else:
-                print(Fore.RED+"PNEXT field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ PNEXT a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[7])+"\n"+str(line))
-            if (re.search('^^-?[0-9]{1,30}$''|^-?20{31}$', line[8])):
-                ERROR_COUNT -= 1
-            else:
-                print(Fore.RED+"TLEN field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ TLEN a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[8])+"\n"+str(line))
-            if (re.search('^\*|[A-Za-z=.]+$', line[9])):
-                ERROR_COUNT -= 1
-            else:
-                print(Fore.RED+"SEQ field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ SEQ a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[9])+"\n"+str(line))
-            if (re.search('^[!-~]+$', line[10])):
-                ERROR_COUNT -= 1
-            else:
-                print(Fore.RED+"QUAL field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ QUAL a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[10])+"\n"+str(line))
+            ERROR_COUNT = integrityCheck(line,re,Fore,rEXPRESSION,i)
 
             # if there is no errors on the line, ERROR_COUNT equals 0
             if ERROR_COUNT == 0:
@@ -315,37 +358,7 @@ def fileAnalysis(file, option, samFile, fileNumber):
                                         mutationsList.append(str(line[9][baseCounter+matchedBase])+" -> "+str(mutations[substitution][-1]))  # store the mutation in the form 'N -> N'
                                         qScoreList.append(str(line[10][baseCounter+matchedBase]))   #   store the QUAL value of substituted base
 
-                                        # around the mutated nucleotide (N): find the codon from the reference sequence and the query sequence in the arbitrary defined open reading frame 1 (ORF1) as XXN
-                                        if baseCounter+matchedBase-2 >= 0 and ((baseCounter+matchedBase) < len(line[9])):
-                                            codonRefCadre1 = (line[9][baseCounter+matchedBase-2],line[9][baseCounter+matchedBase-1],line[9][baseCounter+matchedBase])
-                                            codonQueryCadre1 = (line[9][baseCounter+matchedBase-2],line[9][baseCounter+matchedBase-1],mutations[substitution][-1])
-
-                                        # around the mutated nucleotide (N): find the codon from the reference sequence and the query sequence in the arbitrary defined open reading frame 2 (ORF2) as XNX
-                                        if baseCounter+matchedBase-1 >= 0 and ((baseCounter+matchedBase+1) < len(line[9])):
-                                            codonRefCadre2 = (line[9][baseCounter+matchedBase-1],line[9][baseCounter+matchedBase],line[9][baseCounter+matchedBase+1])
-                                            codonQueryCadre2 = (line[9][baseCounter+matchedBase-1],mutations[substitution][-1],line[9][baseCounter+matchedBase+1])
-
-                                        # around the mutated nucleotide (N): find the codon from the reference sequence and the query sequence in the arbitrary defined open reading frame 3 (ORF3) as NXX
-                                        if baseCounter+matchedBase >= 0 and ((baseCounter+matchedBase+2) < len(line[9])):
-                                            codonRefCadre3 = (line[9][baseCounter+matchedBase],line[9][baseCounter+matchedBase+1],line[9][baseCounter+matchedBase+2])
-                                            codonQueryCadre3 = (mutations[substitution][-1],line[9][baseCounter+matchedBase+1],line[9][baseCounter+matchedBase+2])
-                                         
-                                        # associate the precedently found codons to the corresponding amino acid, for each ORF
-                                        for codons in dCODONS.keys():
-                                            if "".join(codonRefCadre1) == codons: codonR1 = dCODONS[codons]
-                                            if "".join(codonRefCadre2) == codons: codonR2 = dCODONS[codons]
-                                            if "".join(codonRefCadre3) == codons: codonR3 = dCODONS[codons]
-                                            if "".join(codonQueryCadre1) == codons: codonQ1 = dCODONS[codons]
-                                            if "".join(codonQueryCadre2) == codons: codonQ2 = dCODONS[codons]
-                                            if "".join(codonQueryCadre3) == codons: codonQ3 = dCODONS[codons]
-
-                                        # test whether the amino acid from the query match the one from the reference, if so return "synonymous", if not, indicates which amino acid is substituted with which
-                                        if codonR1 == codonQ1: mutRelevanceC1List.append("synonymous")
-                                        else: mutRelevanceC1List.append("non synonymous ("+str(codonR1)+" to "+str(codonQ1)+")")
-                                        if codonR2 == codonQ2: mutRelevanceC2List.append("synonymous")
-                                        else: mutRelevanceC2List.append("non synonymous ("+str(codonR2)+" to "+str(codonQ2)+")")                                        
-                                        if codonR3 == codonQ3: mutRelevanceC3List.append("synonymous")
-                                        else: mutRelevanceC3List.append("non synonymous ("+str(codonR3)+" to "+str(codonQ3)+")")
+                                        mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List = mutationTranslation(baseCounter,matchedBase,line,dCODONS,mutations,substitution,mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List)
 
                                         baseCounter += matchedBase + 1  # set the counter to the place of the mutation, in case of a double mutation in the read
 
@@ -396,7 +409,7 @@ def fileAnalysis(file, option, samFile, fileNumber):
             dicoSubstitutions[mutation] = 1
     sortedDicoSub = sorted(dicoSubstitutions.items(),key=lambda x:x[1], reverse=True)    # sort the dictionary in descending order
 
-    outputCsv.write(str(cARGUMENTS_LIST[samFile])+"\nn°read,Nucleotide N°,Mutation,Base call accuracy (%),ORF1,ORF2,ORF3\n")
+    outputCsv.write(str(cARGUMENTS_LIST[samFile])+"\nn°read,Position,Mutation,Base call accuracy (%),ORF1,ORF2,ORF3\n")
 
     # writing of the list of all substitutions found in the query sequence relative to the reference sequence, with the quality of the base call and the nature of the mutation (synonymous or not) in the 3 ORF possible
     for x in range(len(mutationsList)):
