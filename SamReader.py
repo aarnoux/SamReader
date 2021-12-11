@@ -23,13 +23,15 @@ mQUAL_INTERPRET = numpy.array([['!','"','#','$','%','&','\'','(',')','*','+',','
 dHEADER_FIELD_CALL = {0:mHEADER_LINE,1:mREF_SEQ_DICTIONARY,2:mREAD_GROUP,3:mPROGRAM,4:mCOMMENTS}
 dHEADER_TITLE = {0:'Header line',1:'Reference sequence dictionary',2:'Read group',3:'Program',4:'Comments'}
 dCODONS = {"TTT":"Phe","TTC":"Phe","TTA":"Leu","TTG":"Leu","CTT":"Leu","CTC":"Leu","CTA":"Leu","CTG":"Leu","ATT":"Ile","ATC":"Ile","ATA":"Ile","ATG":"Met","GTT":"Val","GTC":"Val","GTA":"Val","GTG":"Val","TCT":"Ser","TCC":"Ser","TCA":"Ser","TCG":"Ser","CCT":"Pro","CCC":"Pro","CCA":"Pro","CCG":"Pro","ACT":"Thr","ACC":"Thr","ACA":"Thr","ACG":"Thr","GCT":"Ala","GCC":"Ala","GCA":"Ala","GCG":"Ala","TAT":"Tyr","TAC":"Tyr","TAA":"STOP","TAG":"STOP","CAT":"His","CAC":"His","CAA":"Gln","CAG":"Gln","AAT":"Asn","AAC":"Asn","AAA":"Lys","AAG":"Lys","GAT":"Asp","GAC":"Asp","GAA":"Glu","GAG":"Glu","TGT":"Cys","TGC":"Cys","TGA":"STOP","TGG":"Trp","CGT":"Arg","CGC":"Arg","CGA":"Arg","CGG":"Arg","AGT":"Ser","AGC":"Ser","AGA":"Arg","AGG":"Arg","GGT":"Gly","GGC":"Gly","GGA":"Gly","GGG":"Gly"}
-dPAIRED_READS = {"unmapped + unmapped":0,"unmapped + totally mapped":0,"unmapped + badly mapped":0,"badly mapped + totally mapped":0,"badly mapped + badly mapped":0,"totally mapped + totally mapped":0}
 
 # Regular expression compile
 rEXPRESSION = re.compile('^[0-9A-Za-z!#$%&+./:;?@^_|~-][0-9A-Za-z!#$%&*+./:;=?@^_|~-]*$')
 
 # Tuple
 tHEADERS = ('@HD','@SQ','@RG','@PG','@CO')
+
+# List
+lAMBIGUITY_CODES = ['M','R','W','S','Y','K','V','H','D','B','N']
 
 # Constant
 cARGUMENTS_LIST = sys.argv
@@ -128,7 +130,7 @@ def help():
 def checkInput(cARGUMENTS_LIST):
     fileNumber = cSCRIPT_CALL
     for arguments in range(len(cARGUMENTS_LIST)):
-        if cARGUMENTS_LIST[arguments] == ("-s" or "-o"):    # extraction of the arguments index corresponding to the first option chosen
+        if (cARGUMENTS_LIST[arguments] == "-s" or "-o") and fileNumber < 3:    # extraction of the arguments index corresponding to the first option chosen
             for file in range(1,arguments): # for files that are given as input (= put before the first option)
                 if os.path.isfile(cARGUMENTS_LIST[file]) ==  False:
                     print("File error : the input is not a file.")
@@ -140,20 +142,22 @@ def checkInput(cARGUMENTS_LIST):
                     print("File error : the file is empty.")
                     exit()
                 else: fileNumber += 1
+
     return fileNumber
 
 # Function that lets the user choose the output mode
 def userOptionChoice(fileNumber):
     option = "NULL"
     if len(cARGUMENTS_LIST)-(fileNumber) <= 0:   # not choosing any option returns an error
-        if input("Error : no options were given, '-hp' for help about how to run the program.\n") == '-hp': helpProgram()
+        if input("Error : no options were given, enter '-hp' for help about how to run the program.\n") == '-hp': helpProgram()
         else: exit()
     if cARGUMENTS_LIST[fileNumber] == "-s": option = "s" # -s means that the results will only be shown in the terminal
-    if len(cARGUMENTS_LIST)-(fileNumber+1) > 0 and cARGUMENTS_LIST[fileNumber+1] == "-o": option = "s+o"
+    if (len(cARGUMENTS_LIST)-(fileNumber+1)) > 0 and cARGUMENTS_LIST[fileNumber+1] == "-o": option = "s+o"
     elif cARGUMENTS_LIST[fileNumber] == "-o": option = "o" # -o means that the results will only be saved in a file
     if option == "NULL":
-        if input("Option error : a non-authorized option was given, '-hp' for help about how to run the program.\n") == '-hp': helpProgram()   # An unauthorized input ends the script
+        if input("Option error : a non-authorized option was given, enter '-hp' for help about how to run the program.\n") == '-hp': helpProgram()   # An unauthorized input ends the script
         else: exit()
+    
     return option
 
 # Function that reads the SAM file as a csv file, with tabulations delimiters, and returns it to be analyzed 
@@ -161,11 +165,12 @@ def fileHandler(samFile):
     fi = open(cARGUMENTS_LIST[samFile])
     file = csv.reader(fi, delimiter = '\t', quoting = csv.QUOTE_NONE)
     fi.close
+    
     return file
 
+# Function that checks if the different fields of the file contain errors based on authoriezd regular expression matching
 def integrityCheck(line,re,Fore,rEXPRESSION,i):
     ERROR_COUNT = 11    # 11 car il y a 11 champs obligatoires dans un fichier SAM
-    
     # Error searching begins by researching the regular expression (RE) from the fields, and then:
     # - if the RE is correct, the counter 'ERROR_COUNT' is decreased by 1
     # - if the RE is incorrect, an error message is printed but the line continues to be analyzed
@@ -213,7 +218,7 @@ def integrityCheck(line,re,Fore,rEXPRESSION,i):
         ERROR_COUNT -= 1
     else:
         print(Fore.RED+"QUAL field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ QUAL a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[10])+"\n"+str(line))
-
+    
     return ERROR_COUNT
 
 # Function that returns the FLAG once converted in binary
@@ -225,192 +230,130 @@ def flagBinary(flag) :
         add = 12 - len(flagB) # We compute the difference between the maximal flag size (12) and the length of the binary flag.
         for t in range(add):
             flagB.insert(0,'0') # We insert 0 to complete until the maximal flag size.
+
     return flagB
 
-def mutationTranslation(baseCounter,matchedBase,line,dCODONS,mutations,substitution,mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List):
+# Function that associates the different possible DNA codons containing the subsituted nucleotide with the corresponding amino acid, and compares the query to the reference result
+def mutationTranslation(lAMBIGUITY_CODES, baseCounter,matchedBase,line,dCODONS,mutations,substitution,mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List):
     # around the mutated nucleotide (N): find the codon from the reference sequence and the query sequence in the arbitrary defined open reading frame 1 (ORF1) as XXN
     if baseCounter+matchedBase-2 >= 0 and ((baseCounter+matchedBase) < len(line[9])):
+        # extract the codon from both sequences
         codonRefCadre1 = (line[9][baseCounter+matchedBase-2],line[9][baseCounter+matchedBase-1],line[9][baseCounter+matchedBase])
         codonQueryCadre1 = (line[9][baseCounter+matchedBase-2],line[9][baseCounter+matchedBase-1],mutations[substitution][-1])
+        # if one of the base in the codons is not A,T,C,G, the amino acid is "not determined" ('ND') 
+        for x in range(len(lAMBIGUITY_CODES)):
+            for y in range (3):
+                if codonRefCadre1[y] == lAMBIGUITY_CODES[x]: codonR1 = 'ND'
+                if codonQueryCadre1[y] == lAMBIGUITY_CODES[x]: codonQ1 = 'ND'
+        # associate the codon to the corresponding amino acid
         for codons in dCODONS.keys():
             if "".join(codonRefCadre1) == codons: codonR1 = dCODONS[codons]
             if "".join(codonQueryCadre1) == codons: codonQ1 = dCODONS[codons]
+        # test whether the amino acid from the query matches the one from the reference, if so return "synonymous", if not, indicates which amino acid is substituted with which
         if codonR1 == codonQ1: mutRelevanceC1List.append("synonymous")
         else: mutRelevanceC1List.append("non synonymous ("+str(codonR1)+" to "+str(codonQ1)+")")
-    else: mutRelevanceC1List.append("NA")
+    else: mutRelevanceC1List.append("ND")
     # around the mutated nucleotide (N): find the codon from the reference sequence and the query sequence in the arbitrary defined open reading frame 2 (ORF2) as XNX
     if baseCounter+matchedBase-1 >= 0 and ((baseCounter+matchedBase+1) < len(line[9])):
         codonRefCadre2 = (line[9][baseCounter+matchedBase-1],line[9][baseCounter+matchedBase],line[9][baseCounter+matchedBase+1])
         codonQueryCadre2 = (line[9][baseCounter+matchedBase-1],mutations[substitution][-1],line[9][baseCounter+matchedBase+1])
+        for x in range(len(lAMBIGUITY_CODES)):
+            for y in range (3):
+                if codonRefCadre2[y] == lAMBIGUITY_CODES[x]: codonR2 = 'ND'
+                if codonQueryCadre2[y] == lAMBIGUITY_CODES[x]: codonQ2 = 'ND'
         for codons in dCODONS.keys():
             if "".join(codonRefCadre2) == codons: codonR2 = dCODONS[codons]
             if "".join(codonQueryCadre2) == codons: codonQ2 = dCODONS[codons]
         if codonR2 == codonQ2: mutRelevanceC2List.append("synonymous")
         else: mutRelevanceC2List.append("non synonymous ("+str(codonR2)+" to "+str(codonQ2)+")")
-    else: mutRelevanceC2List.append("NA")
+    else: mutRelevanceC2List.append("ND")
     # around the mutated nucleotide (N): find the codon from the reference sequence and the query sequence in the arbitrary defined open reading frame 3 (ORF3) as NXX
     if baseCounter+matchedBase >= 0 and ((baseCounter+matchedBase+2) < len(line[9])):
         codonRefCadre3 = (line[9][baseCounter+matchedBase],line[9][baseCounter+matchedBase+1],line[9][baseCounter+matchedBase+2])
         codonQueryCadre3 = (mutations[substitution][-1],line[9][baseCounter+matchedBase+1],line[9][baseCounter+matchedBase+2])
-        # associate the precedently found codons to the corresponding amino acid, for each ORF
+        for x in range(len(lAMBIGUITY_CODES)):
+            for y in range (3):
+                if codonRefCadre3[y] == lAMBIGUITY_CODES[x]: codonR3 = 'ND'
+                if codonQueryCadre3[y] == lAMBIGUITY_CODES[x]: codonQ3 = 'ND'
         for codons in dCODONS.keys():
             if "".join(codonRefCadre3) == codons: codonR3 = dCODONS[codons]
             if "".join(codonQueryCadre3) == codons: codonQ3 = dCODONS[codons]
-        # test whether the amino acid from the query match the one from the reference, if so return "synonymous", if not, indicates which amino acid is substituted with which
         if codonR3 == codonQ3: mutRelevanceC3List.append("synonymous")
         else: mutRelevanceC3List.append("non synonymous ("+str(codonR3)+" to "+str(codonQ3)+")")
-    else: mutRelevanceC3List.append("NA")
+    else: mutRelevanceC3List.append("ND")
    
     return (mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List)
 
-# Function that analyzes the file
-def fileAnalysis(file, option, samFile, fileNumber):
-    # Variables that need to be reinitialized for each file
-    i = 0
-    headerCount = 0
-    unmappedCount = 0
-    badlyMappedCount = 0
-    totallyMappedCount = 0
-    cigarTotalCount = 0
-    pairedReadsTotalCount = 0
-    notPairedReadCount = 0
-    researchQuery = False
-    errorSearch = "NULL"
-    qnameList = []
-    mutatedBaseList = []
-    mutationsList = []
-    qScoreList = []
-    mutRelevanceC1List = []
-    mutRelevanceC2List = []
-    mutRelevanceC3List = []
-    dicoSubstitutions = {}
-    dicoCigar = {}
+# depending of the option: write or print the informations regarding reads
+def outputReadsInfo(option,outputFile,headerCount,totallyMappedCount,badlyMappedCount,unmappedCount,i):
+    if option != 's':
+        outputFile.write("\n**********************************\n\ntotal reads count : "+str(i-headerCount)
+            +"\n\t-> aligned reads count : "+str(totallyMappedCount+badlyMappedCount)+" ("+str(round((totallyMappedCount+badlyMappedCount)*100/(i-headerCount),2))+"% of total reads)"
+            +"\n\t\t-> totally mapped reads count : "+str(totallyMappedCount)
+            +"\n\t\t-> badly mapped reads count : "+str(badlyMappedCount)
+            +"\n\t-> unmapped reads count : "+str(unmappedCount))
+    if option != 'o':
+        print("\n- total reads count: "+str(i-headerCount)
+            +"\n\t-> aligned reads count: "+str(totallyMappedCount+badlyMappedCount)+" ("+str(round((totallyMappedCount+badlyMappedCount)*100/(i-headerCount),2))+"% of total reads)"
+            +"\n\t\t-> totally mapped reads count: "+str(totallyMappedCount)
+            +"\n\t\t-> badly mapped reads count: "+str(badlyMappedCount)
+            +"\n\t-> unmapped reads count: "+str(unmappedCount))
 
-    outputCsv = open("mutationFile"+str(samFile)+".csv","w")
-
-    if option != "s":
-        outputFile = open("outputFile"+str(samFile)+".txt", "w")
-        outputFile.write(str(sys.argv[samFile])+'\n\nInformations :\n')
+# depending of the option: write or print the informations regarding paired read
+def outputPairs(option,outputFile,dicoPairedReads,notPairedReadCount,pairedReadsTotalCount):
+    if option != 's':
+        outputFile.write("\n\n**********************************\n\nanalysis of paired-reads:\n")
+        for x in dicoPairedReads:
+            if dicoPairedReads[x] != 0:
+                outputFile.write("\n"+str(x)+": "+str(round(dicoPairedReads[x]*100/(pairedReadsTotalCount),4))+"%   ("+str(dicoPairedReads[x])+" out of "+str(pairedReadsTotalCount)+" pairs)")
+        if notPairedReadCount != 0: outputFile.write(str(notPairedReadCount)+" reads are not paired.")
     if option != "o":
-        print("\nAnalyzing :\n"+Back.WHITE+Fore.BLACK+str(sys.argv[samFile])+Fore.RESET+Back.RESET)
+        print("\n\n"+Fore.MAGENTA+"- paired read analysis:"+Fore.RESET)
+        for x in dicoPairedReads:
+            if dicoPairedReads[x] != 0:
+                print(str(x)+": "+str(round(dicoPairedReads[x]*100/(pairedReadsTotalCount),4))+"%   ("+str(dicoPairedReads[x])+" out of "+str(pairedReadsTotalCount)+" pairs)")
+        if notPairedReadCount != 0: print(str(notPairedReadCount)+" reads are not paired.")
 
-    for line in file:
-        i += 1
-        ERROR_COUNT = 11    # 11 car il y a 11 champs obligatoires dans un fichier SAM
+# depending of the option: write or print the different CIGAR mutations and their number
+def outputCigar(option,outputFile,refName,mCIGAR_MATRIX,cigarTotalCount,references):
+    if option != 's':
+        for refName in references:
+            outputFile.write("\n\n**********************************\n\nGlobal CIGAR mutations observed on aligned sequences to the reference sequence "+refName+":\n\n")
+            for key in globals()["dicoCigar%s"%refName].keys():
+                for x in range(len(mCIGAR_MATRIX[0,])):
+                    if key == mCIGAR_MATRIX[0,x]:
+                        outputFile.write(str(mCIGAR_MATRIX[1,x])+" : "+str(round((globals()["dicoCigar%s"%refName][key]*100/cigarTotalCount), 4))+"%     ("+str(globals()["dicoCigar%s"%refName][key])+" out of "+str(cigarTotalCount)+" nucleotides)\n")
+    if option != 'o':
+        for refName in references:
+            print("\n"+Fore.MAGENTA+"- mutations analysis (reference: "+refName+")"+Fore.RESET)
+            for key in globals()["dicoCigar%s"%refName].keys():
+                for x in range(len(mCIGAR_MATRIX[0,])):
+                    if key == mCIGAR_MATRIX[0,x]:
+                        print(str(mCIGAR_MATRIX[1,x])+" : "+str(round((globals()["dicoCigar%s"%refName][key]*100/cigarTotalCount), 4))+"%     ("+str(globals()["dicoCigar%s"%refName][key])+" out of "+str(cigarTotalCount)+" nucleotides)")
 
-        # a first sorting is made on whether or not the line is from the header section or not
-        if line[0].startswith(tHEADERS) == True:
-            headerCount += 1
-            for field in range(len(tHEADERS)):
-                if line[0] == tHEADERS[field]:   # Identifying the main section title
-                    if option != "o":
-                        print("\n"+tHEADERS[field]+" - "+dHEADER_TITLE[field])
-                    elif option != "s":
-                        outputFile.write("\n"+tHEADERS[field]+" - "+dHEADER_TITLE[field]+"\n")
-                    for headerSubField in range(1,len(line)):
-                        for m in range(len(dHEADER_FIELD_CALL[field][0])):
-                            if dHEADER_FIELD_CALL[field][0,m] == line[headerSubField][:2]:  # Identifying subsections titles by browsing the first row of the relevant matrix
-                                
-                                # When the subsection is found, print or write the extended description from the second row of the relevant matrix, and the corresponding informations of the analyzed SAM file
-                                if option != "o":
-                                    print(str(dHEADER_FIELD_CALL[field][1,m])+" : "+str(line[headerSubField][3:]))
-                                if option != "s":
-                                    outputFile.write(str(dHEADER_FIELD_CALL[field][1,m])+" : "+str(line[headerSubField][3:]+"\n"))
-        else:
-            ERROR_COUNT = integrityCheck(line,re,Fore,rEXPRESSION,i)
+# depending of the option: write or print the different substitution possible and the number of time they are observed
+def outputSubstitutions(option,outputFile,sortedDicoSub,samFile):
+    if option != 's':
+        outputFile.write("\n**********************************\n\nSummary of nucleotide substitutions:\n\nSubstitution\t\tIteration\n------------------------------------\n")
+        for x in range(len(sortedDicoSub)):
+            outputFile.write(str(sortedDicoSub[x][0])+"\t\t\t"+str(sortedDicoSub[x][1])+"\n")
+        print(Fore.YELLOW+"Output file for "+str(cARGUMENTS_LIST[samFile])+" created."+Fore.RESET)
+    if option != 'o':
+        print("\n"+Fore.MAGENTA+"- summary of nucleotide substitutions:"+Fore.RESET+"\nSubstitution\t\tIteration\n------------------------------------")
+        for x in range(len(sortedDicoSub)):
+            print(str(sortedDicoSub[x][0])+"\t\t\t"+str(sortedDicoSub[x][1]))
 
-            # if there is no errors on the line, ERROR_COUNT equals 0
-            if ERROR_COUNT == 0:
+# Function that renames the output files if the user gave specific names
+def renameFile(option,samFile,fileNumber):
+    if option == "o" and len(cARGUMENTS_LIST) > (fileNumber + samFile) and len(cARGUMENTS_LIST[fileNumber + samFile]) > 2:
+        os.rename("outputFile"+str(samFile)+".txt", cARGUMENTS_LIST[samFile + fileNumber]+".txt")
+    elif option == "s+o" and len(cARGUMENTS_LIST) > (fileNumber + samFile + 1) and len(cARGUMENTS_LIST[fileNumber + samFile + 1]) > 2:
+        os.rename("outputFile"+str(samFile)+".txt", cARGUMENTS_LIST[samFile + fileNumber + 1]+".txt")
 
-                flag = flagBinary(line[1])  # the flag is translated into binary
-
-                # if '100' is present in the flag field, it means that a '4' is in the flag (= unmapped read)
-                if int(flag[-3]) == 1:
-                    unmappedCount += 1
-                    if int(flag[-7]) == 1 : tempStringPrevious = "unmapped"
-                    else: tempString = "unmapped"
-
-                else:
-
-                    # in the CIGAR field, extract the badly mapped reads
-                    if re.match('(?![0-9]+M$)', line[5]):
-                        badlyMappedCount += 1
-                        if int(flag[-7]) == 1 : tempStringPrevious = "badly mapped"
-                        else: tempString = "badly mapped"
-                    else:
-                        totallyMappedCount +=1
-                        if int(flag[-7]) == 1 : tempStringPrevious = "totally mapped"
-                        else: tempString = "totally mapped"
-
-                        # from the totally mapped reads, search for the optional "MD" field
-                        if len(line)-cMIN_LINE_LENGHT > 0:
-                            for field in range(cMIN_LINE_LENGHT,len(line)):
-                                baseCounter = 0
-                                if line[field][:5] == "MD:Z:" and re.match('(?![0-9]+$)', line[field][5:]): # check that the "MD" field is present and the sequence match is not 100%
-                                    mutations = re.findall('[0-9]+\D', line[field])
-                                    for substitution in range(len(mutations)):
-                                        qnameList.append(str(line[0]))
-                                        matchedBase = int(mutations[substitution][:-1])    # if so, extract all mutations
-                                        if int(line[8]) < 0:    # test whether the mutation is present on the complementary read
-                                            mutatedBaseList.append(int(line[3])-baseCounter-matchedBase)    # if the mutation is on the complementary read, substract the mutation position from the beginning of the read alignement
-                                        else:
-                                            mutatedBaseList.append(int(line[3])+baseCounter+matchedBase)    # if the mutation is on the forward read, add the mutation position to the beginning of the read alignement
-                                        mutationsList.append(str(line[9][baseCounter+matchedBase])+" -> "+str(mutations[substitution][-1]))  # store the mutation in the form 'N -> N'
-                                        qScoreList.append(str(line[10][baseCounter+matchedBase]))   #   store the QUAL value of substituted base
-
-                                        mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List = mutationTranslation(baseCounter,matchedBase,line,dCODONS,mutations,substitution,mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List)
-
-                                        baseCounter += matchedBase + 1  # set the counter to the place of the mutation, in case of a double mutation in the read
-
-                    champsCigar = re.findall('[0-9]+\D', line[5])   # find all CIGAR information
-                    for champ in range(len(champsCigar)):
-                        if champsCigar[champ][-1] in dicoCigar.keys():    # check if there is already an entry for the mutation in the dictionary
-                            dicoCigar[champsCigar[champ][-1]] += int(champsCigar[champ][:-1])
-                        else:
-                            dicoCigar[champsCigar[champ][-1]] = int(champsCigar[champ][:-1])
-            
-                # if the read is the second in the pair
-                if int(flag[-8]) == 1:
-                    if (tempString+" + "+tempStringPrevious) in dPAIRED_READS.keys():
-                        dPAIRED_READS[tempString+" + "+tempStringPrevious] += 1
-                    else:
-                        dPAIRED_READS[str(tempStringPrevious)+" + "+str(tempString)] += 1
-                
-                if int(flag[-7]) != 1 and int(flag[-8]) != 1:
-                    notPairedReadCount += 1
-
-            # if there are errors on the line, pass 1 time in the following condition
-            elif researchQuery == False:
-                researchQuery = True
-                errorSearch = input(Back.RED+"Document non analysable"+Back.RESET+" : "+str(ERROR_COUNT)+" erreur(s) d'expressions régulières trouvée(s) à la line "+str(i)+", souhaitez-vous rechercher les erreurs dans le reste du fichier ?\ny/n\n")
-                if errorSearch == "n":
-                    exit()
-                elif errorSearch != "y":
-                    print(Fore.RED+"Input error : exit."+Fore.RESET)
-                    exit()
-
-    # if the user wanted to search the entire file, after the error search is complete exit the script
-    if errorSearch == "y":
-        print(Fore.YELLOW+"End of error research."+Fore.RESET)
-        exit()
-
-    if totallyMappedCount + badlyMappedCount == 0:
-        print(Fore.RED+"No reads could be analyzed"+Fore.RESET)
-        exit()
-
-    for value in dicoCigar: cigarTotalCount += dicoCigar[value]
-    for value in dPAIRED_READS: pairedReadsTotalCount += dPAIRED_READS[value]
-
-    # count of each possible substitution (A->T, A->C, A->G, etc)
-    for mutation in mutationsList:
-        if mutation in dicoSubstitutions.keys():
-            dicoSubstitutions[mutation] += 1
-        else:
-            dicoSubstitutions[mutation] = 1
-    sortedDicoSub = sorted(dicoSubstitutions.items(),key=lambda x:x[1], reverse=True)    # sort the dictionary in descending order
-
+# Function that creates and write in a .csv file
+def csvWriter(samFile,mutationsList,qScoreList,qnameList,mutatedBaseList,mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List):
+    outputCsv = open("mutationFile"+str(samFile)+".csv","w")
     outputCsv.write(str(cARGUMENTS_LIST[samFile])+"\nn°read,Position,Mutation,Base call accuracy (%),ORF1,ORF2,ORF3\n")
-
     # writing of the list of all substitutions found in the query sequence relative to the reference sequence, with the quality of the base call and the nature of the mutation (synonymous or not) in the 3 ORF possible
     for x in range(len(mutationsList)):
         for qScoreListValue in range(len(mQUAL_INTERPRET[0,])):
@@ -420,68 +363,7 @@ def fileAnalysis(file, option, samFile, fileNumber):
     outputCsv.close()
     print(Fore.YELLOW+"\nCSV file for "+str(cARGUMENTS_LIST[samFile])+" created."+Fore.RESET)
 
-    if option != "s":
-        outputFile.write("\n**********************************\n\ntotal reads count : "+str(i-headerCount)
-            +"\n\t-> aligned reads count : "+str(totallyMappedCount+badlyMappedCount)+" ("+str(round((totallyMappedCount+badlyMappedCount)*100/(i-headerCount),2))+"% of total reads)"
-            +"\n\t\t-> totally mapped reads count : "+str(totallyMappedCount)
-            +"\n\t\t-> badly mapped reads count : "+str(badlyMappedCount)
-            +"\n\t-> unmapped reads count : "+str(unmappedCount))
-
-        # writing of the informations regarding the different paired read
-        outputFile.write("\n\n**********************************\n\nanalysis of paired-reads:\n")
-        for x in dPAIRED_READS:
-            if dPAIRED_READS[x] != 0:
-                outputFile.write("\n"+str(x)+": "+str(round(dPAIRED_READS[x]*100/(pairedReadsTotalCount),4))+"%   ("+str(dPAIRED_READS[x])+" out of "+str(pairedReadsTotalCount)+" pairs)")
-        if notPairedReadCount != 0: outputFile.write(str(notPairedReadCount)+" reads are not paired.")
-
-        # writing of the different CIGAR mutations and their number
-        outputFile.write("\n\n**********************************\n\nGlobal CIGAR mutations observed on aligned sequences:\n\n")
-        for key in dicoCigar.keys():
-            for x in range(len(mCIGAR_MATRIX[0,])):
-                if key == mCIGAR_MATRIX[0,x]:
-                    outputFile.write(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/cigarTotalCount), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(cigarTotalCount)+" nucleotides)\n")
-        
-        # writing of the different substitution possible and the number of time they are observed
-        outputFile.write("\n**********************************\n\nSummary of nucleotide substitutions:\n\nSubstitution\t\tIteration\n------------------------------------\n")
-        for x in range(len(sortedDicoSub)):
-            outputFile.write(str(sortedDicoSub[x][0])+"\t\t\t"+str(sortedDicoSub[x][1])+"\n")
-  
-        print(Fore.YELLOW+"Output file for "+str(cARGUMENTS_LIST[samFile])+" created."+Fore.RESET)
-        outputFile.close()
-
-    if option != "o":
-        print("\n- total reads count: "+str(i-headerCount)
-            +"\n\t-> aligned reads count: "+str(totallyMappedCount+badlyMappedCount)+" ("+str(round((totallyMappedCount+badlyMappedCount)*100/(i-headerCount),2))+"% of total reads)"
-            +"\n\t\t-> totally mapped reads count: "+str(totallyMappedCount)
-            +"\n\t\t-> badly mapped reads count: "+str(badlyMappedCount)
-            +"\n\t-> unmapped reads count: "+str(unmappedCount))
-        
-        # writing of the informations regarding the different paired read
-        print("\n\n"+Fore.MAGENTA+"- paired read analysis:"+Fore.RESET)
-        for x in dPAIRED_READS:
-            if dPAIRED_READS[x] != 0:
-                print(str(x)+": "+str(round(dPAIRED_READS[x]*100/(pairedReadsTotalCount),4))+"%   ("+str(dPAIRED_READS[x])+" out of "+str(pairedReadsTotalCount)+" pairs)")
-        if notPairedReadCount != 0: print(str(notPairedReadCount)+" reads are not paired.")
-
-        # writing of the different CIGAR mutations and their number
-        print("\n"+Fore.MAGENTA+"- mutations analysis:"+Fore.RESET)
-        for key in dicoCigar.keys():
-            for x in range(len(mCIGAR_MATRIX[0,])):
-                if key == mCIGAR_MATRIX[0,x]:
-                    print(str(mCIGAR_MATRIX[1,x])+" : "+str(round((dicoCigar[key]*100/cigarTotalCount), 4))+"%     ("+str(dicoCigar[key])+" out of "+str(cigarTotalCount)+" nucleotides)")
-        
-        # writing of the different substitution possible and the number of time they are observed
-        print("\n"+Fore.MAGENTA+"- summary of nucleotide substitutions:"+Fore.RESET+"\nSubstitution\t\tIteration\n------------------------------------")
-        for x in range(len(sortedDicoSub)):
-            print(str(sortedDicoSub[x][0])+"\t\t\t"+str(sortedDicoSub[x][1]))
-
-    # rename the output files if the user gave specific names
-    if option == "o" and len(cARGUMENTS_LIST) > (fileNumber + samFile) and len(cARGUMENTS_LIST[fileNumber + samFile]) > 2:
-        os.rename("outputFile"+str(samFile)+".txt", cARGUMENTS_LIST[samFile + fileNumber]+".txt")
-    elif option == "s+o" and len(cARGUMENTS_LIST) > (fileNumber + samFile + 1) and len(cARGUMENTS_LIST[fileNumber + samFile + 1]) > 2:
-        os.rename("outputFile"+str(samFile)+".txt", cARGUMENTS_LIST[samFile + fileNumber + 1]+".txt")
-
-# main function
+# main function that analyzes the files
 def main(cARGUMENTS_LIST):
     if len(cARGUMENTS_LIST) == 1: helpProgram()
     help()
@@ -489,7 +371,169 @@ def main(cARGUMENTS_LIST):
     option = userOptionChoice(fileNumber)
     for samFile in range(1,fileNumber):
         file = fileHandler(samFile)
-        fileAnalysis(file, option, samFile, fileNumber)
+        i = 0
+        headerCount = 0
+        unmappedCount = 0
+        badlyMappedCount = 0
+        totallyMappedCount = 0
+        cigarTotalCount = 0
+        pairedReadsTotalCount = 0
+        notPairedReadCount = 0
+        researchQuery = False
+        errorSearch = "NULL"
+        outputFile = open("samreader_NULL","w")   # initialization with an empty file to be able to use the output functions even with the option '-o' not selected
+        qnameList = []
+        mutatedBaseList = []
+        references = []
+        mutationsList = []
+        qScoreList = []
+        mutRelevanceC1List = []
+        mutRelevanceC2List = []
+        mutRelevanceC3List = []
+        dicoSubstitutions = {}
+        dicoPairedReads = {"unmapped + unmapped":0,"unmapped + totally mapped":0,"unmapped + badly mapped":0,"badly mapped + totally mapped":0,"badly mapped + badly mapped":0,"totally mapped + totally mapped":0}
+
+        if option != "s":
+            outputFile = open("outputFile"+str(samFile)+".txt", "w")
+            outputFile.write(str(sys.argv[samFile])+'\n\nInformations :\n')
+        print("\nAnalyzing :\n"+Back.WHITE+Fore.BLACK+str(sys.argv[samFile])+Fore.RESET+Back.RESET)
+
+        for line in file:
+            i += 1
+            ERROR_COUNT = 11    # 11 car il y a 11 champs obligatoires dans un fichier SAM
+
+            # a first sorting is made on whether or not the line is from the header section or not
+            if line[0].startswith(tHEADERS) == True:
+                headerCount += 1
+                for field in range(len(tHEADERS)):
+                    if line[0] == tHEADERS[field]:   # Identifying the main section title
+                        if option != "o":
+                            print("\n"+tHEADERS[field]+" - "+dHEADER_TITLE[field])
+                        elif option != "s":
+                            outputFile.write("\n"+tHEADERS[field]+" - "+dHEADER_TITLE[field]+"\n")
+                        for headerSubField in range(1,len(line)):
+                            for m in range(len(dHEADER_FIELD_CALL[field][0])):
+                                if dHEADER_FIELD_CALL[field][0,m] == line[headerSubField][:2]:  # Identifying subsections titles by browsing the first row of the relevant matrix
+                                    
+                                    # When the subsection is found, print or write the extended description from the second row of the relevant matrix, and the corresponding informations of the analyzed SAM file
+                                    if option != "o":
+                                        print(str(dHEADER_FIELD_CALL[field][1,m])+" : "+str(line[headerSubField][3:]))
+                                    if option != "s":
+                                        outputFile.write(str(dHEADER_FIELD_CALL[field][1,m])+" : "+str(line[headerSubField][3:]+"\n"))
+            
+            else:
+                ERROR_COUNT = integrityCheck(line,re,Fore,rEXPRESSION,i)
+
+                # if there is no errors on the line, ERROR_COUNT equals 0
+                if ERROR_COUNT == 0 and researchQuery == False:
+
+                    flag = flagBinary(line[1])
+
+                    # if '100' is present in the flag field, it means that a '4' is in the flag (= unmapped read)
+                    if int(flag[-3]) == 1:
+                        unmappedCount += 1
+                        if int(flag[-7]) == 1 : tempStringPrevious = "unmapped"
+                        else: tempString = "unmapped"
+                    else:
+                        if i == headerCount+unmappedCount+1:
+                            references.append(line[2])
+                            globals()["dicoCigar%s"%references[0]] = {}
+                            a = 1
+                        for refName in references:
+                            if refName != line[2]:
+                                if a < len(references):
+                                    a += 1
+                                    references.append(line[2])
+                                    globals()["dicoCigar%s"%refName] = {}
+
+                        # in the CIGAR field, extract the badly mapped reads
+                        if re.match('(?![0-9]+M$)', line[5]):
+                            badlyMappedCount += 1
+                            if int(flag[-7]) == 1 : tempStringPrevious = "badly mapped"
+                            else: tempString = "badly mapped"
+                        else:
+                            totallyMappedCount +=1
+                            if int(flag[-7]) == 1 : tempStringPrevious = "totally mapped"
+                            else: tempString = "totally mapped"
+
+                            # from the totally mapped reads, search for the optional "MD" field
+                            if len(line)-cMIN_LINE_LENGHT > 0:
+                                for field in range(cMIN_LINE_LENGHT,len(line)):
+                                    baseCounter = 0
+                                    if line[field][:5] == "MD:Z:" and re.match('(?![0-9]+$)', line[field][5:]): # check that the "MD" field is present and the sequence match is not 100%
+                                        mutations = re.findall('[0-9]+\D', line[field])
+                                        for substitution in range(len(mutations)):
+                                            qnameList.append(str(line[0]))
+                                            matchedBase = int(mutations[substitution][:-1])    # if so, extract all mutations
+                                            if int(line[8]) < 0:    # test whether the mutation is present on the complementary read
+                                                mutatedBaseList.append(int(line[3])-baseCounter-matchedBase)    # if the mutation is on the complementary read, substract the mutation position from the beginning of the read alignement
+                                            else:
+                                                mutatedBaseList.append(int(line[3])+baseCounter+matchedBase)    # if the mutation is on the forward read, add the mutation position to the beginning of the read alignement
+                                            mutationsList.append(str(line[9][baseCounter+matchedBase])+" -> "+str(mutations[substitution][-1]))  # store the mutation in the form 'N -> N'
+                                            qScoreList.append(str(line[10][baseCounter+matchedBase]))   #   store the QUAL value of substituted base
+
+                                            mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List = mutationTranslation(lAMBIGUITY_CODES,baseCounter,matchedBase,line,dCODONS,mutations,substitution,mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List)
+
+                                            baseCounter += matchedBase + 1  # set the counter to the place of the mutation, in case of a double mutation in the read
+
+                        champsCigar = re.findall('[0-9]+\D', line[5])   # find all CIGAR information
+                        for champ in range(len(champsCigar)):
+                            if champsCigar[champ][-1] in globals()["dicoCigar%s"%refName].keys():    # check if there is already an entry for the mutation in the dictionary
+                                globals()["dicoCigar%s"%refName][champsCigar[champ][-1]] += int(champsCigar[champ][:-1])
+                            else:
+                                globals()["dicoCigar%s"%refName][champsCigar[champ][-1]] = int(champsCigar[champ][:-1])
+
+                    # if the read is the second in the pair
+                    if int(flag[-8]) == 1:
+                        if (tempString+" + "+tempStringPrevious) in dicoPairedReads.keys():
+                            dicoPairedReads[tempString+" + "+tempStringPrevious] += 1
+                        else:
+                            dicoPairedReads[str(tempStringPrevious)+" + "+str(tempString)] += 1
+                    
+                    if int(flag[-7]) != 1 and int(flag[-8]) != 1:
+                        notPairedReadCount += 1
+
+                # if there are errors on the line, pass 1 time in the following condition
+                elif researchQuery == False:
+                    researchQuery = True
+                    errorSearch = input(Back.RED+"Document non analysable"+Back.RESET+" : "+str(ERROR_COUNT)+" erreur(s) d'expressions régulières trouvée(s) à la line "+str(i)+", souhaitez-vous rechercher les erreurs dans le reste du fichier ?\ny/n\n")
+                    if errorSearch == "n":
+                        exit()
+                    elif errorSearch != "y":
+                        print(Fore.RED+"Input error : exit."+Fore.RESET)
+                        exit()
+
+        # if the user wanted to search the entire file, after the error search is complete exit the script
+        if errorSearch == "y":
+            print(Fore.YELLOW+"End of error research."+Fore.RESET)
+            exit()
+
+        if totallyMappedCount + badlyMappedCount == 0:
+            print(Fore.RED+"No reads could be analyzed"+Fore.RESET)
+            exit()
+
+        for value in globals()["dicoCigar%s"%refName]: cigarTotalCount += globals()["dicoCigar%s"%refName][value]
+        for value in dicoPairedReads: pairedReadsTotalCount += dicoPairedReads[value]
+
+        # count of each possible substitution (A->T, A->C, A->G, etc)
+        for mutation in mutationsList:
+            if mutation in dicoSubstitutions.keys():
+                dicoSubstitutions[mutation] += 1
+            else:
+                dicoSubstitutions[mutation] = 1
+        sortedDicoSub = sorted(dicoSubstitutions.items(),key=lambda x:x[1], reverse=True)    # sort the dictionary in descending order
+
+        csvWriter(samFile,mutationsList,qScoreList,qnameList,mutatedBaseList,mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List)
+
+        outputReadsInfo(option,outputFile,headerCount,totallyMappedCount,badlyMappedCount,unmappedCount,i)
+        outputPairs(option,outputFile,dicoPairedReads,notPairedReadCount,pairedReadsTotalCount)
+        outputCigar(option,outputFile,refName,mCIGAR_MATRIX,cigarTotalCount,references)
+        outputSubstitutions(option,outputFile,sortedDicoSub,samFile)
+
+        outputFile.close()
+        os.remove("samreader_NULL")   # remove the eventual empty file used as a decoy for the output functions
+
+        renameFile(option,samFile,fileNumber)
 
 if __name__ == "__main__":
     main(sys.argv)
