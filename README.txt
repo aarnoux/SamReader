@@ -40,6 +40,7 @@ This README file is organized as follow :
 SamReader is a programm that analyses SAM files. It was developped with Python 3. It can analyse multiple files
 in one go. Results are either shown in the terminal or written in an output file. Features include:
 - Verifying the integrity of the files given as arguments.
+- Quantification and classification of reads, read pairs, and gap or overlap within read pairs
 - Mutation analysis includes:
 	-> quantification of each type of mutations possible from CIGAR analysis
 	For substitution mutations:
@@ -96,8 +97,8 @@ $ ~/path/to/file/SamReader.py -hp
 
 **** OUTPUT ****
 
-A CSV file that contains the list of all the substitution found in the query sequence relative to the reference, with the quality of
-base calling, read ID, and whether or not the mutation is synonymous for each possible reading frames.
+A CSV file that contains the list of all the substitution found in the query sequence relative to the reference, with the quality of base calling, read ID, and whether or not the mutation is synonymous for each possible reading frames.
+
 The output in the terminal or in file is presented as follow:
 
 
@@ -122,6 +123,20 @@ total reads count : 351330
 		-> totally mapped reads count : 349893
 		-> partially mapped reads count : 122
 	-> unmapped reads count : 1315
+
+# informations about the paired reads
+- paired read analysis:
+unmapped + unmapped: 0.37%   (650 out of 175665 pairs)
+unmapped + badly mapped: 0.0085%   (15 out of 175665 pairs)
+badly mapped + totally mapped: 0.0609%   (107 out of 175665 pairs)
+totally mapped + totally mapped: 99.5605%   (174893 out of 175665 pairs)
+
+- pairs alignement analysis:	# is printed only if the reads are paired
+6924 read pairs are well aligned on both ends of the fragment
+
+52732 read pairs present a gap of [1,10[ nucleotide(s) between the forward and the reverse read
+
+55400 read pairs present an overlap of [1,10[ nucleotide(s) between the forward and the reverse read
 
 # mutations informations as given by the CIGAR field
 Mutations analysis:
