@@ -134,13 +134,13 @@ def checkInput(cARGUMENTS_LIST):
         if str(cARGUMENTS_LIST[arguments]) == "-s" or str(cARGUMENTS_LIST[arguments]) == "-o":    # extraction of the arguments index corresponding to the first option chosen
             for file in range(1,arguments): # for files that are given as input (= put before the first option)
                 if os.path.isfile(cARGUMENTS_LIST[file]) ==  False:
-                    print("File error : the input is not a file.")
+                    print("File error for "+str(cARGUMENTS_LIST[file])+": the input is not a file.")
                     exit()
                 elif cARGUMENTS_LIST[file].endswith(".sam") == False: 
-                    print("Format error : only SAM file format is accepted as input.")
+                    print("Format error for "+str(cARGUMENTS_LIST[file])+": only SAM file format is accepted as input.")
                     exit()
                 elif os.path.getsize(cARGUMENTS_LIST[file]) == 0:
-                    print("File error : the file is empty.")
+                    print("File error for "+str(cARGUMENTS_LIST[file])+": the file is empty.")
                     exit()
                 else: fileNumber += 1
             break
@@ -352,9 +352,9 @@ def outputSubstitutions(option,outputFile,sortedDicoSub,samFile):
 
 # Function that renames the output files if the user gave specific names
 def renameFile(option,samFile,fileNumber):
-    if option == "o" and len(cARGUMENTS_LIST) > (fileNumber + samFile) and len(cARGUMENTS_LIST[fileNumber + samFile]) > 2:
+    if option == "o" and len(cARGUMENTS_LIST) > (fileNumber + samFile):
         os.rename("outputFile"+str(samFile)+".txt", cARGUMENTS_LIST[samFile + fileNumber]+".txt")
-    elif option == "s+o" and len(cARGUMENTS_LIST) > (fileNumber + samFile + 1) and len(cARGUMENTS_LIST[fileNumber + samFile + 1]) > 2:
+    elif option == "s+o" and len(cARGUMENTS_LIST) > (fileNumber + samFile + 1):
         os.rename("outputFile"+str(samFile)+".txt", cARGUMENTS_LIST[samFile + fileNumber + 1]+".txt")
 
 # Function that creates and write in a .csv file
@@ -369,6 +369,85 @@ def csvWriter(samFile,mutationsList,qScoreList,qnameList,mutatedBaseList,mutRele
                 outputCsv.write(str(qnameList[x])+","+str(mutatedBaseList[x])+","+str(mutationsList[x])+","+str(round((1-(10**(-quality/10)))*100,2))+","+mutRelevanceC1List[x]+","+mutRelevanceC2List[x]+","+mutRelevanceC3List[x]+"\n")
     outputCsv.close()
     print(Fore.YELLOW+"\nCSV file for "+str(cARGUMENTS_LIST[samFile])+" created."+Fore.RESET)
+
+# Function that classifies read pairs according to the length of either the gap or the layering between the forward and reverse read
+def gapPairs(line,dicoGap,readLength):
+    if int(line[8]) > 0:
+        gap = int(line[8]) - (2*int(readLength))    # determines if this is a gap or a layering
+        if gap == 0:    # if the reads are perfectly align with one another
+                dicoGap[0] += 1
+        else:
+            if gap < 0: # if there is a gap
+                for x in range(-int(readLength),0,10):  # for range of 10 nucleotides per 10 nucleotides
+                    if x - gap >= 0:    # if the gap is over 10 nucleotides long, find the nearest lower ten
+                        if x in dicoGap.keys():
+                            dicoGap[x] += 1
+                        else:
+                            dicoGap[x] = 1
+                        break
+                    elif gap > -10: # if the gap is under 10 nucleotides long
+                        dicoGap[-1] += 1
+                        break
+            else:
+                for x in range(0,int(readLength),10):
+                    if x - gap >= 0:    # if the layering is over 10 nucleotides long, find the nearest lower ten
+                        if x in dicoGap.keys():
+                            dicoGap[x] += 1
+                        else:
+                            dicoGap[x] = 1
+                        break
+                    elif gap < 10:  # if the layering is under 10 nucleotides long
+                        dicoGap[1] += 1
+                        break
+
+    return dicoGap
+
+# Function that prints or writes the number of well aligned read pairs
+def outputAlignWell(option,dicoGap,outputFile):
+        if option != "o":
+            for gap in dicoGap.keys():
+                if gap == 0:
+                    print(str(dicoGap[gap])+" read pairs are well aligned on both ends of the fragment\n")
+        if option != "s":
+            for gap in dicoGap.keys():
+                if gap == 0:
+                    outputFile.write(str(dicoGap[gap])+" read pairs are well aligned on both ends of the fragment\n")
+
+# Function that prints or writes the number of read pairs with a gap between them
+def outputAlignGap(option,dicoGap,outputFile):
+        if option != 'o':
+            for gap in dicoGap.keys():
+                if gap > 0:
+                    if gap == 1:
+                        print(str(dicoGap[gap])+" read pairs present a gap of [1,10[ nucleotide(s) between the forward and the reverse read")
+                    else:
+                        print(str(dicoGap[gap])+" read pairs present a gap of ["+str(gap)+","+str(gap+10)+ "[ nucleotide(s) between the forward and the reverse read")
+        if option != "s":
+            for gap in dicoGap.keys():
+                if gap > 0:
+                    if gap == 1:
+                        outputFile.write(str(dicoGap[gap])+" read pairs present a gap of [1,10[ nucleotide(s) between the forward and the reverse read\n")
+                    else:
+                        outputFile.write(str(dicoGap[gap])+" read pairs present a gap of ["+str(gap)+","+str(gap+10)+ "[ nucleotide(s) between the forward and the reverse read\n")
+
+# Function that prints or writes the number of read pairs that overlap with each other
+def outputAlignOverlap(option,dicoGap,outputFile):
+        if option != 'o':
+            print("")
+            for gap in dicoGap.keys():
+                if gap < 0:
+                    if gap == -1:
+                        print(str(dicoGap[gap])+" read pairs present an overlap of [1,10[ nucleotide(s) between the forward and the reverse read")
+                    else:
+                        print(str(dicoGap[gap])+" read pairs present an overlap of ["+str(gap*-1)+"," +str((gap*-1)+10)+"[ nucleotide(s) between the forward and the reverse read")
+        if option != "s":
+            print("")
+            for gap in dicoGap.keys():
+                if gap < 0:
+                    if gap == -1:
+                        outputFile.write(str(dicoGap[gap])+" read pairs present an overlap of [1,10[ nucleotide(s) between the forward and the reverse read\n")
+                    else:
+                        outputFile.write(str(dicoGap[gap])+" read pairs present an overlap of ["+str(gap*-1)+"," +str((gap*-1)+10)+"[ nucleotide(s) between the forward and the reverse read\n")
 
 # main function that analyzes the files
 def main(cARGUMENTS_LIST):
@@ -398,6 +477,7 @@ def main(cARGUMENTS_LIST):
         mutRelevanceC3List = []
         dicoSubstitutions = {}
         dicoPairedReads = {"unmapped + unmapped":0,"unmapped + totally mapped":0,"unmapped + badly mapped":0,"badly mapped + totally mapped":0,"badly mapped + badly mapped":0,"totally mapped + totally mapped":0}
+        dicoGap = {-1:0,0:0,1:0}
 
         if option != "s":
             outputFile = open("outputFile"+str(samFile)+".txt", "w")
@@ -464,6 +544,7 @@ def main(cARGUMENTS_LIST):
                             else: tempString = "badly mapped"
                         else:
                             totallyMappedCount +=1
+                            readLength = line[5][:3]
                             if int(flag[-7]) == 1 : tempStringPrevious = "totally mapped"
                             else: tempString = "totally mapped"
 
@@ -480,12 +561,14 @@ def main(cARGUMENTS_LIST):
                                                 mutatedBaseList.append(int(line[3])-baseCounter-matchedBase)    # if the mutation is on the complementary read, substract the mutation position from the beginning of the read alignement
                                             else:
                                                 mutatedBaseList.append(int(line[3])+baseCounter+matchedBase)    # if the mutation is on the forward read, add the mutation position to the beginning of the read alignement
-                                            mutationsList.append(str(line[9][baseCounter+matchedBase])+" -> "+str(mutations[substitution][-1]))  # store the mutation in the form 'N -> N'
+                                            mutationsList.append(str(line[9][baseCounter+matchedBase])+" -> "+str(mutations[substitution][-1]))  # store the mutation in the form 'X -> X'
                                             qScoreList.append(str(line[10][baseCounter+matchedBase]))   #   store the QUAL value of substituted base
 
                                             mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List = mutationTranslation(lAMBIGUITY_CODES,baseCounter,matchedBase,line,dCODONS,mutations,substitution,mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List)
 
                                             baseCounter += matchedBase + 1  # set the counter to the place of the mutation, in case of a double mutation in the read
+
+                        dicoGap = gapPairs(line,dicoGap,readLength)
 
                     # if the read is the second in the pair
                     if int(flag[-8]) == 1:
@@ -535,6 +618,14 @@ def main(cARGUMENTS_LIST):
 
         outputReadsInfo(option,outputFile,headerCount,totallyMappedCount,badlyMappedCount,unmappedCount,i)
         outputPairs(option,outputFile,dicoPairedReads,notPairedReadCount,pairedReadsTotalCount)
+        if pairedReadsTotalCount != 0:
+            if option != "o":
+                print(Fore.MAGENTA+"\n- pairs alignement analysis:"+Fore.RESET)
+            if option != "s":
+                outputFile.write("\n\npairs alignement analysis:\n")
+            outputAlignWell(option,dicoGap,outputFile)
+            outputAlignGap(option,dicoGap,outputFile)
+            outputAlignOverlap(option,dicoGap,outputFile)
         outputCigar(option,outputFile,mCIGAR_MATRIX,references)
         outputSubstitutions(option,outputFile,sortedDicoSub,samFile)
 
