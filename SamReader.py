@@ -7,8 +7,7 @@ __version__ = "0.0.1"
 __date__ = "12/14/2021"
 __licence__ ="This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>."
 
-import os, sys, csv, re, colorama, numpy
-from colorama import Fore, Back, Style
+import os, sys, csv, re, numpy
 
 # Matrix
 mHEADER_LINE = numpy.array([['VN','SO','GO','SS'],['Format version','Sorting order of alignments','Grouping of alignments','Sub-sorting order of alignments']])
@@ -38,9 +37,6 @@ cARGUMENTS_LIST = sys.argv
 cSCRIPT_CALL = 1
 cMIN_LINE_LENGHT = 11
 
-# Increasing the maximal size of csv fields in order to be able to analyze reads > 131kb
-csv.field_size_limit(sys.maxsize)
-
 # Help functions
 def helpFlag():
     print("\nCombination of bitwise FLAGs. Each bit is explained in the following table:\n\n"
@@ -61,8 +57,8 @@ def helpFlag():
     exit()
 
 def helpRequirements():
-    print("\nThis program runs with "+Fore.RED+"python 3"+Fore.RESET+", and needs the following packages:\n"
-            +Fore.YELLOW+"os\tsys\tcsv\tre\tnumpy\tcolorama"+Fore.RESET+"\n"
+    print("\nThis program runs with python 3, and needs the following packages:\n"
+            +"os\tsys\tcsv\tre\tnumpy\n"
             +"You can install them using the following commands:\n\n"
             +"$ conda install <package name>\nor\n$ pip install <package name>")
     exit()
@@ -111,7 +107,7 @@ def helpProgram():
             +"-s	show the results in the terminal, without saving them in a file\n"
             +"-o	save the results in a file which name is given by the user, or in the default file 'summary_data_file.txt'\n"
             +"-s -o	show the results int he terminal AND save them in a file\n"
-            +"\nEnter "+Fore.YELLOW+"$ /path/to/SamReader.py -h"+Fore.RESET+" for help")
+            +"\nEnter $ /path/to/SamReader.py -h for help")
     exit()
 
 # The help() function analyses the input of the user and call the corresponding help function
@@ -171,7 +167,7 @@ def fileHandler(samFile):
     return file
 
 # Function that checks if the different fields of the file contain errors based on authoriezd regular expression matching
-def integrityCheck(line,re,Fore,rEXPRESSION,i):
+def integrityCheck(line,re,rEXPRESSION,i):
     ERROR_COUNT = 11    # 11 car il y a 11 champs obligatoires dans un fichier SAM
     # Error searching begins by researching the regular expression (RE) from the fields, and then:
     # - if the RE is correct, the counter 'ERROR_COUNT' is decreased by 1
@@ -179,47 +175,47 @@ def integrityCheck(line,re,Fore,rEXPRESSION,i):
     if (re.search('^[!-?A-~]{1,254}$', line[0])):
         ERROR_COUNT -= 1
     else:
-        print(Fore.RED+"QNAME field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ QNAME a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[0])+"\n"+str(line))
+        print("QNAME field error: Erreur de contenu à la ligne "+str(i)+" , le champ QNAME a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[0])+"\n"+str(line))
     if (re.search('^[0-9]{1,4}$', line[1])):
         ERROR_COUNT -= 1
     else:
-        print(Fore.RED+"FLAG field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ FLAG a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[1])+"\n"+str(line))
+        print("FLAG field error: Erreur de contenu à la ligne "+str(i)+" , le champ FLAG a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[1])+"\n"+str(line))
     if (rEXPRESSION.search(line[2]) or re.search('\*', line[2])):
         ERROR_COUNT -= 1
     else:
-        print(Fore.RED+"RNAME field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ RNAME a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[2])+"\n"+str(line))
+        print("RNAME field error: Erreur de contenu à la ligne "+str(i)+" , le champ RNAME a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[2])+"\n"+str(line))
     if (re.search('^[0-9]*$', line[3])):
         ERROR_COUNT -= 1
     else:
-        print(Fore.RED+"POS field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ POS a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[3])+"\n"+str(line))
+        print("POS field error: Erreur de contenu à la ligne "+str(i)+" , le champ POS a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[3])+"\n"+str(line))
     if (re.search('^[0-5][0-9]$''|^[0-9]$''|^(60)$''|^(255)$', line[4])):
         ERROR_COUNT -= 1
     else:
-        print(Fore.RED+"MAPQ field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ MAPQ a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[4])+"\n"+str(line))
+        print("MAPQ field error: Erreur de contenu à la ligne "+str(i)+" , le champ MAPQ a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[4])+"\n"+str(line))
     if (re.search('^\*$''|^([0-9]+[MIDNSHPX=])+$', line[5])):
         ERROR_COUNT -= 1
     else:
-        print(Fore.RED+"CIGAR field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ CIGAR a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[5])+"\n"+str(line))                             
+        print("CIGAR field error: Erreur de contenu à la ligne "+str(i)+" , le champ CIGAR a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[5])+"\n"+str(line))                             
     if (rEXPRESSION.search(line[6]) or re.search('^\*$', line[6]) or re.search('^=$', line[6])):
         ERROR_COUNT -= 1
     else:
-        print(Fore.RED+"RNEXT field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ RNEXT a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[6])+"\n"+str(line))
+        print("RNEXT field error: Erreur de contenu à la ligne "+str(i)+" , le champ RNEXT a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[6])+"\n"+str(line))
     if (re.search('^[0-9]*$', line[7])):
         ERROR_COUNT -= 1
     else:
-        print(Fore.RED+"PNEXT field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ PNEXT a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[7])+"\n"+str(line))
+        print("PNEXT field error: Erreur de contenu à la ligne "+str(i)+" , le champ PNEXT a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[7])+"\n"+str(line))
     if (re.search('^^-?[0-9]{1,30}$''|^-?20{31}$', line[8])):
         ERROR_COUNT -= 1
     else:
-        print(Fore.RED+"TLEN field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ TLEN a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[8])+"\n"+str(line))
+        print("TLEN field error: Erreur de contenu à la ligne "+str(i)+" , le champ TLEN a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[8])+"\n"+str(line))
     if (re.search('^\*|[A-Za-z=.]+$', line[9])):
         ERROR_COUNT -= 1
     else:
-        print(Fore.RED+"SEQ field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ SEQ a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[9])+"\n"+str(line))
+        print("SEQ field error: Erreur de contenu à la ligne "+str(i)+" , le champ SEQ a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[9])+"\n"+str(line))
     if (re.search('^[!-~]+$', line[10])):
         ERROR_COUNT -= 1
     else:
-        print(Fore.RED+"QUAL field error"+Fore.RESET+" : Erreur de contenu à la ligne "+str(i)+" , le champ QUAL a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[10])+"\n"+str(line))
+        print("QUAL field error: Erreur de contenu à la ligne "+str(i)+" , le champ QUAL a une expression régulière non conforme, ou un des champ de la line n'est pas délimité par une tabulation.\nChamp non conforme : "+str(line[10])+"\n"+str(line))
     
     return ERROR_COUNT
 
@@ -315,7 +311,7 @@ def outputPairs(option,outputFile,dicoPairedReads,notPairedReadCount,pairedReads
                 outputFile.write("\n"+str(x)+": "+str(round(dicoPairedReads[x]*100/(pairedReadsTotalCount),4))+"%   ("+str(dicoPairedReads[x])+" out of "+str(pairedReadsTotalCount)+" pairs)")
         if notPairedReadCount != 0: outputFile.write(str(notPairedReadCount)+" reads are not paired.")
     if option != "o":
-        print("\n\n"+Fore.MAGENTA+"- paired read analysis:"+Fore.RESET)
+        print("\n\n- paired read analysis:")
         for x in dicoPairedReads:
             if dicoPairedReads[x] != 0:
                 print(str(x)+": "+str(round(dicoPairedReads[x]*100/(pairedReadsTotalCount),4))+"%   ("+str(dicoPairedReads[x])+" out of "+str(pairedReadsTotalCount)+" pairs)")
@@ -324,16 +320,17 @@ def outputPairs(option,outputFile,dicoPairedReads,notPairedReadCount,pairedReads
 # depending of the option: write or print the different CIGAR mutations and their number, relatively to the eventual different reference sequences
 def outputCigar(option,outputFile,mCIGAR_MATRIX,references):
     if option != 's':
+        outputFile.write("\n\n**********************************\n\nGlobal CIGAR mutations observed on aligned sequences:\n\n")
         for refName in references:
-            outputFile.write("\n\n**********************************\n\nGlobal CIGAR mutations observed on aligned sequences to the reference sequence "+refName+":\n\n")
+            outputFile.write("\n-> reference sequence: "+refName+"\n")
             for key in globals()["dicoCigar%s"%refName].keys(): # browse the different reference sequences
                 for x in range(len(mCIGAR_MATRIX[0,])): # browse the different found mutations in the CIGAR field
                     if key == mCIGAR_MATRIX[0,x]:
                         outputFile.write(str(mCIGAR_MATRIX[1,x])+" : "+str(round((globals()["dicoCigar%s"%refName][key]*100/globals()["cigarTotalCount%s"%refName]), 4))+"%     ("+str(globals()["dicoCigar%s"%refName][key])+" out of "+str(globals()["cigarTotalCount%s"%refName])+" nucleotides)\n")
     if option != 'o':
-        print("\n"+Fore.MAGENTA+"- mutations analysis:"+Fore.RESET)
+        print("\n- mutations analysis:")
         for refName in references:
-            print(Fore.MAGENTA+Style.DIM+"\t-> reference sequence: "+refName+Fore.RESET+Style.RESET_ALL)
+            print("\t-> reference sequence: "+refName)
             for key in globals()["dicoCigar%s"%refName].keys():
                 for x in range(len(mCIGAR_MATRIX[0,])):
                     if key == mCIGAR_MATRIX[0,x]:
@@ -346,7 +343,7 @@ def outputSubstitutions(option,outputFile,sortedDicoSub,samFile):
         for x in range(len(sortedDicoSub)): # browse the different substitutions found in the alignement
             outputFile.write(str(sortedDicoSub[x][0])+"\t\t\t"+str(sortedDicoSub[x][1])+"\n")
     if option != 'o':
-        print("\n"+Fore.MAGENTA+"- summary of nucleotide substitutions:"+Fore.RESET+"\nSubstitution\t\tIteration\n------------------------------------")
+        print("\n- summary of nucleotide substitutions:\nSubstitution\t\tIteration\n------------------------------------")
         for x in range(len(sortedDicoSub)):
             print(str(sortedDicoSub[x][0])+"\t\t\t"+str(sortedDicoSub[x][1]))
 
@@ -368,7 +365,7 @@ def csvWriter(samFile,mutationsList,qScoreList,qnameList,mutatedBaseList,mutRele
                 quality = int(mQUAL_INTERPRET[1,qScoreListValue])
                 outputCsv.write(str(qnameList[x])+","+str(mutatedBaseList[x])+","+str(mutationsList[x])+","+str(round((1-(10**(-quality/10)))*100,2))+","+mutRelevanceC1List[x]+","+mutRelevanceC2List[x]+","+mutRelevanceC3List[x]+"\n")
     outputCsv.close()
-    print(Fore.YELLOW+"\nCSV file for "+str(cARGUMENTS_LIST[samFile])+" created."+Fore.RESET)
+    print("\nCSV file for "+str(cARGUMENTS_LIST[samFile])+" created.")
 
 # Function that classifies read pairs according to the length of either the gap or the layering between the forward and reverse read
 def gapPairs(line,dicoGap,readLength):
@@ -482,7 +479,7 @@ def main(cARGUMENTS_LIST):
         if option != "s":
             outputFile = open("outputFile"+str(samFile)+".txt", "w")
             outputFile.write(str(sys.argv[samFile])+'\n\nInformations :\n')
-        print("\nAnalyzing :\n"+Back.WHITE+Fore.BLACK+str(sys.argv[samFile])+Fore.RESET+Back.RESET)
+        print("\nAnalyzing :\n"+str(sys.argv[samFile]))
 
         for line in file:
             i += 1
@@ -508,7 +505,7 @@ def main(cARGUMENTS_LIST):
                                         outputFile.write(str(dHEADER_FIELD_CALL[field][1,m])+" : "+str(line[headerSubField][3:]+"\n"))
             
             else:
-                ERROR_COUNT = integrityCheck(line,re,Fore,rEXPRESSION,i)
+                ERROR_COUNT = integrityCheck(line,re,rEXPRESSION,i)
 
                 # if there is no errors on the line, ERROR_COUNT equals 0
                 if ERROR_COUNT == 0 and researchQuery == False:
@@ -583,20 +580,20 @@ def main(cARGUMENTS_LIST):
                 # if there are errors on the line, pass 1 time in the following condition
                 elif researchQuery == False:
                     researchQuery = True
-                    errorSearch = input(Back.RED+"Document non analysable"+Back.RESET+" : "+str(ERROR_COUNT)+" erreur(s) d'expressions régulières trouvée(s) à la line "+str(i)+", souhaitez-vous rechercher les erreurs dans le reste du fichier ?\ny/n\n")
+                    errorSearch = input("Document non analysable: "+str(ERROR_COUNT)+" erreur(s) d'expressions régulières trouvée(s) à la line "+str(i)+", souhaitez-vous rechercher les erreurs dans le reste du fichier ?\ny/n\n")
                     if errorSearch == "n":
                         exit()
                     elif errorSearch != "y":
-                        print(Fore.RED+"Input error : exit."+Fore.RESET)
+                        print("Input error : exit.")
                         exit()
 
         # if the user wanted to search the entire file, after the error search is complete exit the script
         if errorSearch == "y":
-            print(Fore.YELLOW+"End of error research."+Fore.RESET)
+            print("End of error research.")
             exit()
 
         if totallyMappedCount + badlyMappedCount == 0:
-            print(Fore.RED+"No reads could be analyzed"+Fore.RESET)
+            print("No reads could be analyzed")
             exit()
 
         for refName in references:
@@ -614,13 +611,13 @@ def main(cARGUMENTS_LIST):
 
         csvWriter(samFile,mutationsList,qScoreList,qnameList,mutatedBaseList,mutRelevanceC1List,mutRelevanceC2List,mutRelevanceC3List)
         if option != 's':
-            print(Fore.YELLOW+"Output file for "+str(cARGUMENTS_LIST[samFile])+" created."+Fore.RESET)
+            print("Output file for "+str(cARGUMENTS_LIST[samFile])+" created.")
 
         outputReadsInfo(option,outputFile,headerCount,totallyMappedCount,badlyMappedCount,unmappedCount,i)
         outputPairs(option,outputFile,dicoPairedReads,notPairedReadCount,pairedReadsTotalCount)
         if pairedReadsTotalCount != 0:
             if option != "o":
-                print(Fore.MAGENTA+"\n- pairs alignement analysis:"+Fore.RESET)
+                print("\n- pairs alignement analysis:")
             if option != "s":
                 outputFile.write("\n\npairs alignement analysis:\n")
             outputAlignWell(option,dicoGap,outputFile)
