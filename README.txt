@@ -52,17 +52,39 @@ created independently of the option choosen.
 
 ATTENTION: The three ORF are arbitrarily defined for each mutations, as such you CAN NOT compare the results between different lines from the .csv file.
 
+
 **** EXECUTION ****
 
-This extra step is sometime necessary on MacOS, does not concern Linux or Windows users:
+Make sure that you run the version 3 of Python.
+SamReader requires the following modules to function correctly:
+-re
+-numpy
+-os
+-sys
+-csv
+
+You can install them with the following command:
+- Linux/MacOS:
+$ pip install <package name>
+- Windows:
+> python -m pip install <package name>
+
+This extra step is sometimes necessary on MacOS, does not concern Linux or Windows users:
 Add execution permission to the script:
 $ chmod +x ~/path/to/file/SamReader.py
 
-Run the following command in the terminal to execute SamReader (output file field is optionnal):
-$ ~/path/to/file/SamReader.py <input-file.sam> -options <output-file.txt>
+Go to the directory containing the script, or add the path to your .bashrc or equivalent, then run the following command in the terminal to execute SamReader (output file field is optionnal):
+- Linus/MacOS:
+$ SamReader.py <input-file.sam> -options <output-file.txt>
+- Windows:
+> py SamReader.py <input-file.sam> -options <output-file.txt>
 
-SamReader can analyse mutliple files at once (output files fields are optionnals):
-$ ~/path/to/file/SamReader.py <input-file1.sam> <input-file2.sam> -options <output-file1.txt> <outpute-file2.txt>
+SamReader can analyse multiple files at once (output files fields are optionnals):
+- Linus/MacOS:
+$ SamReader.py <input-file1.sam> <input-file2.sam> -options <output-file1.txt> <outpute-file2.txt>
+- Windows:
+> py SamReader.py <input-file1.sam> <input-file2.sam> -options <output-file1.txt> <outpute-file2.txt>
+
 
 
 **** OPTIONS ****
@@ -75,24 +97,25 @@ Choosing from one of the following options is MANDATORY :
 
 **** HELP ****
 
-$ ~/path/to/file/SamReader.py -h	access help to show the different sections available and choose one of them,
-					or enter directly in the terminal one of the following terms :
+The commands are shown for Linux/MacOS users, please adapt for Windows user as presented in section "EXECUTION".
 
-Sections:
+$ SamReader.py -h	access help to show the different sections available and choose one of them
+
+Or enter directly in the terminal one of the following terms :
 -hf	show details about the FLAG field
-$ ~/path/to/file/SamReader.py -hf
+$ SamReader.py -hf
 
 -hc	show details about the CIGAR field
-$ ~/path/to/file/SamReader.py -hc
+$ SamReader.py -hc
 
 -hr	show details about the requirements to run the programm
-$ ~/path/to/file/SamReader.py -hr
+$ SamReader.py -hr
 
 -hs	show details about the SAM file format
-$ ~/path/to/file/SamReader.py -hs
+$ SamReader.py -hs
 
 -hp	show details about the programm
-$ ~/path/to/file/SamReader.py -hp
+$ SamReader.py -hp
 
 
 **** OUTPUT ****
