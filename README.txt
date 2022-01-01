@@ -47,8 +47,7 @@ in one go. Results are either shown in the terminal or written in an output file
 	-> calculation of the number of each substitution possibilities (i.e. A->T, A->C, A->G, etc)
 	-> list of all the substitution found in the query sequence relative to the reference, with the quality of
 	base calling, and whether or not the mutation is synonymous for each possible open reading frames (ORF)
-- Output in the terminal (-s), in a file (-o) or both (-s -o). A CSV file containing the list described above is
-created independently of the option choosen.
+- Output  in a file (-o) and a CSV file containing the list described above is created independently of the option choosen.
 
 ATTENTION: The three ORF are arbitrarily defined for each mutations, as such you CAN NOT compare the results between different lines from the .csv file.
 
@@ -90,9 +89,9 @@ $ SamReader.py <input-file1.sam> <input-file2.sam> -options <output-file1.txt> <
 **** OPTIONS ****
 
 Choosing from one of the following options is MANDATORY :
--s	show the results in the terminal, without saving them in a file
--o	save the results in a file which name is given by the user, or in the default file "outputFile.txt"
--s -o	show the results in the terminal AND save them in a file
+-o		followed by desired names for output files: save the results in said file.
+--check		followed by a number or 'all': indicates how much of the file to screen for SAM field errors. Not putting this option results in no checking
+		while putting 'all' results in the verification of the totality of the file. The analysis is approx. 30% slower when checking all than when not 		performing any verifications.
 
 
 **** HELP ****
@@ -161,14 +160,14 @@ totally mapped + totally mapped: 99.5605%   (174893 out of 175665 pairs)
 
 55400 read pairs present an overlap of [1,10[ nucleotide(s) between the forward and the reverse read
 
-# mutations informations as given by the CIGAR field
+# mutations informations as given by the CIGAR field (relative to reference sequences)
 Mutations analysis:
 Alignement Match : 99.9951%     (35000611 out of 35002311 nucleotides)
 Deletion : 0.0002%     (61 out of 35002311 nucleotides)
 Insertion : 0.0001%     (18 out of 35002311 nucleotides)
 Soft Clipping : 0.0046%     (1621 out of 35002311 nucleotides)
 
-# number of each substitution possibilities sorted in descending order
+# number of each substitution possibilities sorted in descending order (relative to reference sequences)
 Summary of nucleotide substitutions :
 Substitution		Iteration
 ------------------------------------
