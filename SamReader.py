@@ -300,7 +300,7 @@ def integrity_check(line, re, line_number, to_check):
         # There are 11 mandatory fields.
         ERROR_COUNT = 11
         # Verifying regular expression matching to official documentation.
-        if re.fullmatch('[!-?A-~]{1, 254}', line[0]):
+        if re.fullmatch('[!-?A-~]{1,254}', line[0]):
             ERROR_COUNT -= 1
         # if the field is incorrect,  an error message is displayed
         else:
